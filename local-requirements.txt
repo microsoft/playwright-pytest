@@ -1,0 +1,10 @@
+black==19.10b0
+pytest==6.0.1
+pytest-cov==2.10.0
+mypy==0.782
+setuptools==49.2.0
+twine==3.2.0
+twisted==20.3.0
+wheel==0.34.2
+flake8==3.8.3
+pre-commit==2.6.0
