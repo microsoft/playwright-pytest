@@ -71,22 +71,22 @@ def event_loop() -> Generator[AbstractEventLoop, None, None]:
 
 
 @pytest.fixture(scope="session")
-def launch_arguments() -> Dict:
+def browse_type_launch_args() -> Dict:
     return {}
 
 
 @pytest.fixture(scope="session")
-def context_arguments() -> Dict:
+def browse_context_args() -> Dict:
     return {}
 
 
 @pytest.fixture(scope="session")
 def launch_browser(
-    pytestconfig: Any, launch_arguments: Dict, browser_name: str
+    pytestconfig: Any, browse_type_launch_args: Dict, browser_name: str
 ) -> Callable[..., Browser]:
     def launch(**kwargs: Dict[Any, Any]) -> Browser:
         headful_option = pytestconfig.getoption("--headful")
-        launch_options = {**launch_arguments, **kwargs}
+        launch_options = {**browse_type_launch_args, **kwargs}
         if headful_option:
             launch_options["headless"] = False
         pw_context = sync_playwright()
@@ -113,9 +113,9 @@ def browser(launch_browser: Callable[[], Browser]) -> Generator[Browser, None, N
 
 @pytest.fixture
 def context(
-    browser: Browser, context_arguments: Dict
+    browser: Browser, browse_context_args: Dict
 ) -> Generator[BrowserContext, None, None]:
-    context = browser.newContext(**context_arguments)
+    context = browser.newContext(**browse_context_args)
     yield context
     context.close()
 

@@ -2,7 +2,7 @@
 
 ![CI](https://github.com/microsoft/playwright-pytest/workflows/CI/badge.svg)
 [![PyPI](https://img.shields.io/pypi/v/pytest-playwright)](https://pypi.org/project/pytest-playwright/)
-[![Coverage Status](https://coveralls.io/repos/github/microsoft/playwright-pytest/badge.svg?branch=master)](https://coveralls.io/github/microsoft/playwright-pytest?branch=main)
+[![Coverage Status](https://coveralls.io/repos/github/microsoft/playwright-pytest/badge.svg?branch=main)](https://coveralls.io/github/microsoft/playwright-pytest?branch=main)
 [![black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/python/black)
 
 > A Pytest wrapper for [Playwright](https://github.com/microsoft/playwright-python) to automate web browsers (Chromium, Firefox, WebKit).
@@ -38,7 +38,7 @@ A string that contains the current browser name.
 
 ### `browser` - session scope
 
-A Playwright browser instance for the whole test run.
+A Playwright browser instance for the session.
 
 ### `context` - function scope
 
@@ -48,13 +48,13 @@ A separate Playwright context instance for each new test.
 
 A separate Playwright page instance for each new test.
 
-### `launch_arguments` - session scope
+### `browse_type_launch_args` - session scope
 
-A fixture that you can define to overwrite the launch arguments. It should return a Dict.
+A fixture that you can define to overwrite the launch arguments for [`launch()`](https://playwright.dev/#path=docs%2Fapi.md&q=browsertypelaunchoptions). It should return a Dict.
 
-### `context_arguments` - session scope
+### `browse_context_args` - session scope
 
-A fixture that you can define to overwrite the context arguments. It should return a Dict.
+A fixture that you can define to overwrite the context arguments for [`newContext()`](https://playwright.dev/#path=docs%2Fapi.md&q=browsernewcontextoptions). It should return a Dict.
 
 ### `is_chromium`, `is_firefox`, `is_webkit` - session scope
 
