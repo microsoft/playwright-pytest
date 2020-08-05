@@ -23,11 +23,10 @@ pip install pytest-playwright
 Basic example for more see the [examples sections](#examples) as a reference.
 
 ```py
-def test_is_chromium(page):
-    page.goto("https://www.google.com")
-    page.type("input[name=q]", "Playwright GitHub")
-    page.click("input[type=submit]")
-    page.waitForSelector("text=microsoft/Playwright")
+def test_example_is_working(page):
+    page.goto("https://example.com")
+    page.waitForSelector("text=Example Domain")
+    page.click("text=More information")
 ```
 
 ## Fixtures
@@ -80,8 +79,8 @@ By default, the tests run in headless mode. You can pass the `--headful` CLI fla
 import pytest
 
 @pytest.mark.skip_browser("firefox")
-def test_is_chromium(page):
-    page.goto("https://www.google.com")
+def test_visit_example(page):
+    page.goto("https://example.com")
     # ...
 ```
 
@@ -91,8 +90,8 @@ def test_is_chromium(page):
 import pytest
 
 @pytest.mark.only_browser("chromium")
-def test_is_chromium(page):
-    page.goto("https://www.google.com")
+def test_visit_example(page):
+    page.goto("https://example.com")
     # ...
 ```
 
@@ -101,7 +100,7 @@ def test_is_chromium(page):
 Start Pytest with the `base-url` argument. Example: `pytest --base-url http://localhost:8080`
 
 ```py
-def test_is_chromium(page):
+def test_visit_example(page):
     page.goto("/admin")
     # -> Will result in http://localhost:8080/admin
 ```
@@ -111,7 +110,7 @@ def test_is_chromium(page):
 ```py
 from playwright.sync_api import Page
 
-def test_my_test(page: Page):
+def test_visit_admin_dashboard(page: Page):
     page.goto("/admin")
     # ...
 ```
