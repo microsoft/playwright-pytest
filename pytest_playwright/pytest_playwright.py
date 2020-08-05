@@ -25,6 +25,11 @@ from playwright.sync_api import Browser, BrowserContext, Page
 def pytest_generate_tests(metafunc: Any) -> None:
     if "browser_name" in metafunc.fixturenames:
         browsers = metafunc.config.option.browser or ["chromium"]
+        for browser in browsers:
+            if browser not in ["chromium", "firefox", "webkit"]:
+                raise ValueError(
+                    f"'{browser}' is not allowed. Only chromium, firefox, or webkit are valid browser names."
+                )
         metafunc.parametrize("browser_name", browsers, scope="session")
 
 
