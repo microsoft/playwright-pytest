@@ -165,3 +165,15 @@ def test_headful(testdir: Any) -> None:
     )
     result = testdir.runpytest("--browser", "chromium", "--headful")
     result.assert_outcomes(passed=1)
+
+
+def test_invalid_browser_name(testdir: Any) -> None:
+    testdir.makepyfile(
+        """
+        def test_base_url(page):
+            pass
+    """
+    )
+    result = testdir.runpytest("--browser", "test123")
+    result.assert_outcomes(errors=1)
+    assert "'test123' is not allowed" in "\n".join(result.outlines)
