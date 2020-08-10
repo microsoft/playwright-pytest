@@ -23,7 +23,6 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install coveralls
         pip install -r local-requirements.txt
         pip install -e .
         python -m playwright install
@@ -38,7 +37,3 @@ jobs:
     - name: Test on Linux
       if: ${{ matrix.os == 'ubuntu-latest' }}
       run: xvfb-run pytest --cov=pytest_playwright --cov-report xml
-    - name: Coveralls
-      run: coveralls
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

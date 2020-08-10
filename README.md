@@ -2,7 +2,6 @@
 
 ![CI](https://github.com/microsoft/playwright-pytest/workflows/CI/badge.svg)
 [![PyPI](https://img.shields.io/pypi/v/pytest-playwright)](https://pypi.org/project/pytest-playwright/)
-[![Coverage Status](https://coveralls.io/repos/github/microsoft/playwright-pytest/badge.svg?branch=main)](https://coveralls.io/github/microsoft/playwright-pytest?branch=main)
 [![black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/python/black)
 
 > A Pytest wrapper for [Playwright](https://github.com/microsoft/playwright-python) to automate web browsers (Chromium, Firefox, WebKit).
