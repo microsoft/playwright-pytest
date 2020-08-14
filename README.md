@@ -117,7 +117,7 @@ def test_visit_admin_dashboard(page: Page):
 
 ## Debugging
 
-To pause the Pytest test execution and interact with the browser via the developer tools or call Playwright interactively, you can use the `breakpoint()` statement in your code to get a [pdb](https://docs.python.org/3/library/pdb.html) inline REPL.
+To pause the Pytest test execution and interact with the browser (if its launched with `headless=False`) via the developer tools or call Playwright interactively, you can use the `breakpoint()` statement in your code to get a [pdb](https://docs.python.org/3/library/pdb.html) inline REPL.
 
 ### Create a screenshot if a test fails
 
