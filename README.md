@@ -114,6 +114,26 @@ def test_visit_admin_dashboard(page: Page):
     # ...
 ```
 
+## Debugging
+
+To pause the Pytest test execution and interact with the browser (if its launched with `headless=False`) via the developer tools or call Playwright interactively, you can use the `breakpoint()` statement in your code to get a [pdb](https://docs.python.org/3/library/pdb.html) inline REPL.
+
+### Create a screenshot if a test fails
+
+On the CI it's useful to have screenshots if a test is failing, this can be implemented by adding the following in your `conftest.py` which will store the screenshots in the `.playwright-screenshots` directory which can be uploaded e.g. in your CI as an artifact.
+
+```py
+from slugify import slugify
+
+def pytest_runtest_makereport(item, call) -> None:
+    if call.when == "call":
+        if call.excinfo is not None:
+            page = item.funcargs["page"]
+            screenshot_dir = Path(".playwright-screenshots")
+            screenshot_dir.mkdir(exist_ok=True)
+            page.screenshot(path=str(screenshot_dir / f"{slugify(item.nodeid)}.png"))
+```
+
 ## Special thanks
 
 [Max Schmitt](https://github.com/mxschmitt) for creating and maintaining the Pytest Playwright plugin.
