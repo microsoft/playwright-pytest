@@ -122,8 +122,11 @@ To pause the Pytest test execution and interact with the browser (if its launche
 
 On the CI it's useful to have screenshots if a test is failing, this can be implemented by adding the following in your `conftest.py` which will store the screenshots in the `.playwright-screenshots` directory which can be uploaded e.g. in your CI as an artifact.
 
+This snippet requires `slugify` to convert test names to file paths, which can be installed with `pip install python-slugify`.
+
 ```py
 from slugify import slugify
+from pathlib import Path
 
 def pytest_runtest_makereport(item, call) -> None:
     if call.when == "call":
