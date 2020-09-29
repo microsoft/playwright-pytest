@@ -46,19 +46,19 @@ def test_multiple_browsers(testdir: Any) -> None:
     result.assert_outcomes(passed=3)
 
 
-def test_browse_context_args(testdir: Any) -> None:
+def test_browser_context_args(testdir: Any) -> None:
     testdir.makeconftest(
         """
         import pytest
 
         @pytest.fixture(scope="session")
-        def browse_context_args(request):
+        def browser_context_args(request):
             return {"userAgent": "foobar"}
     """
     )
     testdir.makepyfile(
         """
-        def test_browse_context_args(page):
+        def test_browser_context_args(page):
             assert page.evaluate("window.navigator.userAgent") == "foobar"
     """
     )
