@@ -46,11 +46,11 @@ A separate Playwright context instance for each new test.
 
 A separate Playwright page instance for each new test.
 
-### `browse_type_launch_args` - session scope
+### `browser_type_launch_args` - session scope
 
 A fixture that you can define to overwrite the launch arguments for [`launch()`](https://playwright.dev/#path=docs%2Fapi.md&q=browsertypelaunchoptions). It should return a Dict.
 
-### `browse_context_args` - session scope
+### `browser_context_args` - session scope
 
 A fixture that you can define to overwrite the context arguments for [`newContext()`](https://playwright.dev/#path=docs%2Fapi.md&q=browsernewcontextoptions). It should return a Dict.
 
