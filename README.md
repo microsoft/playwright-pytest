@@ -1,78 +1,80 @@
-# Pytest Playwright Plugin
+# Pytest plugin for Playwright [![PyPI](https://img.shields.io/pypi/v/pytest-playwright)](https://pypi.org/project/pytest-playwright/)
 
-![CI](https://github.com/microsoft/playwright-pytest/workflows/CI/badge.svg)
-[![PyPI](https://img.shields.io/pypi/v/pytest-playwright)](https://pypi.org/project/pytest-playwright/)
-[![black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/python/black)
+Write end-to-end tests for your web apps with [Playwright](https://github.com/microsoft/playwright-python) and [pytest](https://docs.pytest.org/en/stable/).
 
-> A Pytest wrapper for [Playwright](https://github.com/microsoft/playwright-python) to automate web browsers (Chromium, Firefox, WebKit).
+- Support for **all modern browsers** including Chromium, WebKit and Firefox.
+- Support for **headless and headful** execution.
+- **Built-in fixtures** that provide browser primitives to test functions.
 
-## Features
-
-- Have a separate new page and context for each test with Pytest fixtures
-- Run your end-to-end tests on multiple browsers by a CLI argument
-- Run them headful with the `--headful` argument to debug them easily
-- Using [base-url](https://github.com/pytest-dev/pytest-base-url) to only use the relative URL in your `Page.goto` calls
-
-## Installation
+## Usage
 
 ```
 pip install pytest-playwright
 ```
 
-Basic example for more see the [examples sections](#examples) as a reference.
+Use the `page` fixture to write a basic test. See [more examples](#examples).
 
 ```py
 def test_example_is_working(page):
     page.goto("https://example.com")
-    page.waitForSelector("text=Example Domain")
+    assert page.innerText('h1') == 'Example Domain'
     page.click("text=More information")
 ```
 
+To run your tests, use pytest CLI.
+
+```sh
+# Run tests (Chromium and headless by default)
+pytest
+
+# Run tests in headful mode
+pytest --headful
+
+# Run tests in a different browser (chromium, firefox, webkit)
+pytest --browser firefox
+
+# Run tests in multiple browsers
+pytest --browser chromium --browser webkit
+```
+
 ## Fixtures
+This plugin configures Playwright-specific [fixtures for pytest](https://docs.pytest.org/en/latest/fixture.html). To use these fixtures, use the fixture name as an argument to the test function.
 
-### `browser_name` - session scope
+```py
+def test_my_app_is_working(fixture_name):
+    # Test using fixture_name
+    # ...
+```
 
-A string that contains the current browser name.
+**Function scope**: These fixtures are created when requested in a test function and destroyed when the test ends.
 
-### `browser` - session scope
+- `context`: New [browser context](https://playwright.dev/#path=docs%2Fcore-concepts.md&q=browser-contexts) for a test.
+- `page`: New [browser page](https://playwright.dev/#path=docs%2Fcore-concepts.md&q=pages-and-frames) for a test.
 
-A Playwright browser instance for the session.
+**Session scope**: These fixtures are created when requested in a test function and destroyed when all tests end.
 
-### `context` - function scope
+- `browser`: Browser instance launched by Playwright.
+- `browser_name`: Browser name as string.
+- `is_chromium`, `is_webkit`, `is_firefox`: Booleans for the respective browser types.
 
-A separate Playwright context instance for each new test.
+**Customizing fixture options**: For `browser` and `context` fixtures, use the the following fixtures to define custom launch options.
 
-### `page` - function scope
-
-A separate Playwright page instance for each new test.
-
-### `browser_type_launch_args` - session scope
-
-A fixture that you can define to overwrite the launch arguments for [`launch()`](https://playwright.dev/#path=docs%2Fapi.md&q=browsertypelaunchoptions). It should return a Dict.
-
-### `browser_context_args` - session scope
-
-A fixture that you can define to overwrite the context arguments for [`newContext()`](https://playwright.dev/#path=docs%2Fapi.md&q=browsernewcontextoptions). It should return a Dict.
-
-### `is_chromium`, `is_firefox`, `is_webkit` - session scope
-
-A fixture which is a boolean if a specific execution is made by the specified browser.
-
-## CLI arguments
-
-### `--browser`
-
-By default, the tests run on the Chromium browser. You can pass multiple times the `--browser` flag to run it on different browsers or a single time to run it only on a specific browser.
-
-Possible values: `chromium`, `firefox`, `webkit`
-
-### `--headful`
-
-By default, the tests run in headless mode. You can pass the `--headful` CLI flag to run the browser in headful mode.
+- `browser_type_launch_args`: Override launch arguments for [`browserType.launch()`](https://playwright.dev/#path=docs%2Fapi.md&q=browsertypelaunchoptions). It should return a Dict.
+- `browser_context_args`: Override the options for [`browser.newContext()`](https://playwright.dev/#path=docs%2Fapi.md&q=browsernewcontextoptions). It should return a Dict.
 
 ## Examples
 
-### Skipping by browser type
+#### Configure Mypy typings for auto-completion
+
+```py
+from playwright.sync_api import Page
+
+def test_visit_admin_dashboard(page: Page):
+    page.goto("/admin")
+    # ...
+```
+
+#### Skip test by browser
 
 ```py
 import pytest
@@ -83,7 +85,7 @@ def test_visit_example(page):
     # ...
 ```
 
-### Running only on a specific browser
+#### Run on a specific browser
 
 ```py
 import pytest
@@ -94,9 +96,13 @@ def test_visit_example(page):
     # ...
 ```
 
-### Handle base-url
+#### Configure base-url
 
-Start Pytest with the `base-url` argument. Example: `pytest --base-url http://localhost:8080`
+Start Pytest with the `base-url` argument. 
+
+```sh
+pytest --base-url http://localhost:8080
+```
 
 ```py
 def test_visit_example(page):
@@ -104,27 +110,26 @@ def test_visit_example(page):
     # -> Will result in http://localhost:8080/admin
 ```
 
-### Using Mypy types for auto completion
+## Debugging
+
+#### Use with pdb
+Use the `breakpoint()` statement in your test code to pause execution and get a [pdb](https://docs.python.org/3/library/pdb.html) REPL.
 
 ```py
-from playwright.sync_api import Page
-
-def test_visit_admin_dashboard(page: Page):
-    page.goto("/admin")
+def test_bing_is_working(page):
+    page.goto("https://bing.com")
+    breakpoint()
     # ...
 ```
 
-## Debugging
+#### Screenshot on test failure
 
-To pause the Pytest test execution and interact with the browser (if its launched with `headless=False`) via the developer tools or call Playwright interactively, you can use the `breakpoint()` statement in your code to get a [pdb](https://docs.python.org/3/library/pdb.html) inline REPL.
+You can capture screenshots for failed tests with a [pytest runtest hook](https://docs.pytest.org/en/6.1.0/reference.html?highlight=pytest_runtest_makereport#test-running-runtest-hooks). Add this to your `conftest.py` file.
 
-### Create a screenshot if a test fails
-
-On the CI it's useful to have screenshots if a test is failing, this can be implemented by adding the following in your `conftest.py` which will store the screenshots in the `.playwright-screenshots` directory which can be uploaded e.g. in your CI as an artifact.
-
-This snippet requires `slugify` to convert test names to file paths, which can be installed with `pip install python-slugify`.
+Note that this snippet uses `slugify` to convert test names to file paths, which can be installed with `pip install python-slugify`.
 
 ```py
+# In conftest.py
 from slugify import slugify
 from pathlib import Path
 
@@ -137,20 +142,9 @@ def pytest_runtest_makereport(item, call) -> None:
             page.screenshot(path=str(screenshot_dir / f"{slugify(item.nodeid)}.png"))
 ```
 
+## Deploy to CI
+Use the [Playwright GitHub Action](https://github.com/microsoft/playwright-github-action) or [guides for other CI providers](https://playwright.dev/#path=docs%2Fci.md&q=) to deploy your tests to CI/CD
+
 ## Special thanks
 
-[Max Schmitt](https://github.com/mxschmitt) for creating and maintaining the Pytest Playwright plugin.
-
-## Contributing
-
-This project welcomes contributions and suggestions.  Most contributions require you to agree to a
-Contributor License Agreement (CLA) declaring that you have the right to, and actually do, grant us
-the rights to use your contribution. For details, visit https://cla.opensource.microsoft.com.
-
-When you submit a pull request, a CLA bot will automatically determine whether you need to provide
-a CLA and decorate the PR appropriately (e.g., status check, comment). Simply follow the instructions
-provided by the bot. You will only need to do this once across all repos using our CLA.
-
-This project has adopted the [Microsoft Open Source Code of Conduct](https://opensource.microsoft.com/codeofconduct/).
-For more information see the [Code of Conduct FAQ](https://opensource.microsoft.com/codeofconduct/faq/) or
-contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additional questions or comments.
+Thanks to [Max Schmitt](https://github.com/mxschmitt) for creating and maintaining this project.
