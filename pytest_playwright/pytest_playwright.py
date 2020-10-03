@@ -94,14 +94,13 @@ def launch_browser(
         launch_options = {**browser_type_launch_args, **kwargs}
         if headful_option:
             launch_options["headless"] = False
-        pw_context = sync_playwright()
-        pw = pw_context.__enter__()
+        pw = sync_playwright().start()
         browser = getattr(pw, browser_name).launch(**launch_options)
         browser._close = browser.close
 
         def _handle_close() -> None:
             browser._close()
-            pw_context.__exit__(None, None, None)
+            pw.stop()
 
         browser.close = _handle_close
         return browser
