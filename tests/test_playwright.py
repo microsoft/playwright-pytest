@@ -177,3 +177,17 @@ def test_invalid_browser_name(testdir: Any) -> None:
     result = testdir.runpytest("--browser", "test123")
     result.assert_outcomes(errors=1)
     assert "'test123' is not allowed" in "\n".join(result.outlines)
+
+
+def test_django(testdir: Any) -> None:
+    testdir.makepyfile(
+        """
+    from django.test import TestCase
+    class Proj1Test(TestCase):
+        def test_one(self):
+            self.assertTrue(True)
+
+    """
+    )
+    result = testdir.runpytest()
+    result.assert_outcomes(passed=1)
