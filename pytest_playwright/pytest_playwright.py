@@ -159,6 +159,11 @@ def is_chromium(browser_name: str) -> bool:
     return browser_name == "chromium"
 
 
+@pytest.fixture(scope="session")
+def browser_name() -> None:
+    return None
+
+
 def pytest_addoption(parser: Any) -> None:
     group = parser.getgroup("playwright", "Playwright")
     group.addoption(
