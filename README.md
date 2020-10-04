@@ -37,6 +37,16 @@ pytest --browser firefox
 pytest --browser chromium --browser webkit
 ```
 
+N.B.: If you use an editor like VBCode, you can use the [pytest.ini](https://docs.pytest.org/en/stable/reference.html#ini-options-ref) file for passing additional command line parameters. You can create it in the project's pytest sub-folder:
+```ini
+# content of pytest.ini
+[pytest]
+# Run firefox with UI
+addopts = --headful --browser firefox
+
+```
+
+
 ## Fixtures
 This plugin configures Playwright-specific [fixtures for pytest](https://docs.pytest.org/en/latest/fixture.html). To use these fixtures, use the fixture name as an argument to the test function.
 
