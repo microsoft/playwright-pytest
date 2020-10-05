@@ -37,6 +37,16 @@ pytest --browser firefox
 pytest --browser chromium --browser webkit
 ```
 
+If you want to add the CLI arguments automatically without specifying them, you can use the [pytest.ini](https://docs.pytest.org/en/stable/reference.html#ini-options-ref) file:
+```ini
+# content of pytest.ini
+[pytest]
+# Run firefox with UI
+addopts = --headful --browser firefox
+
+```
+
+
 ## Fixtures
 This plugin configures Playwright-specific [fixtures for pytest](https://docs.pytest.org/en/latest/fixture.html). To use these fixtures, use the fixture name as an argument to the test function.
 
