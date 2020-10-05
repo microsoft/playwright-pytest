@@ -37,7 +37,7 @@ pytest --browser firefox
 pytest --browser chromium --browser webkit
 ```
 
-N.B.: If you use an editor like VBCode, you can use the [pytest.ini](https://docs.pytest.org/en/stable/reference.html#ini-options-ref) file for passing additional command line parameters. You can create it in the project's pytest sub-folder:
+If you want to add the CLI arguments automatically without specifying them, you can use the [pytest.ini](https://docs.pytest.org/en/stable/reference.html#ini-options-ref) file:
 ```ini
 # content of pytest.ini
 [pytest]
