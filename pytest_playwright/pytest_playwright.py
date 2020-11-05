@@ -130,14 +130,14 @@ def _handle_page_goto(
     url = args.pop()
     if not (url.startswith("http://") or url.startswith("https://")):
         url = base_url + url
-    return page._goto(url, *args, **kwargs)
+    return page._goto(url, *args, **kwargs)  # type: ignore
 
 
 @pytest.fixture
 def page(context: BrowserContext, base_url: str) -> Generator[Page, None, None]:
     page = context.newPage()
-    page._goto = page.goto
-    page.goto = lambda *args, **kwargs: _handle_page_goto(
+    page._goto = page.goto  # type: ignore
+    page.goto = lambda *args, **kwargs: _handle_page_goto(  # type: ignore
         page, list(args), kwargs, base_url
     )
     yield page

@@ -120,6 +120,40 @@ def test_visit_example(page):
     # -> Will result in http://localhost:8080/admin
 ```
 
+#### Ignore HTTPS errors
+
+conftest.py
+
+```py
+import pytest
+
+@pytest.fixture(scope="session")
+def browser_context_args(browser_context_args):
+    return {
+        **browser_context_args,
+        "ignoreHTTPSErrors": True
+    }
+```
+
+
+#### Use custom viewport size
+
+conftest.py
+
+```py
+import pytest
+
+@pytest.fixture(scope="session")
+def browser_context_args(browser_context_args):
+    return {
+        **browser_context_args,
+        "viewport": {
+            "width": 1920,
+            "height": 1080,
+        }
+    }
+```
+
 ## Debugging
 
 #### Use with pdb
