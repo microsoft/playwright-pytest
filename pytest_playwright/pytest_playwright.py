@@ -20,6 +20,7 @@ import pytest
 
 from playwright import sync_playwright
 from playwright.sync_api import Browser, BrowserContext, Page
+from playwright.main import SyncPlaywright
 
 
 def pytest_generate_tests(metafunc: Any) -> None:
@@ -86,23 +87,25 @@ def browser_context_args() -> Dict:
 
 
 @pytest.fixture(scope="session")
+def playwright() -> Generator[SyncPlaywright, None, None]:
+    pw = sync_playwright().start()
+    yield pw
+    pw.stop()
+
+
+@pytest.fixture(scope="session")
 def launch_browser(
-    pytestconfig: Any, browser_type_launch_args: Dict, browser_name: str
+    pytestconfig: Any,
+    playwright: SyncPlaywright,
+    browser_type_launch_args: Dict,
+    browser_name: str,
 ) -> Callable[..., Browser]:
     def launch(**kwargs: Dict[Any, Any]) -> Browser:
         headful_option = pytestconfig.getoption("--headful")
         launch_options = {**browser_type_launch_args, **kwargs}
         if headful_option:
             launch_options["headless"] = False
-        pw = sync_playwright().start()
-        browser = getattr(pw, browser_name).launch(**launch_options)
-        browser._close = browser.close
-
-        def _handle_close() -> None:
-            browser._close()
-            pw.stop()
-
-        browser.close = _handle_close
+        browser = getattr(playwright, browser_name).launch(**launch_options)
         return browser
 
     return launch

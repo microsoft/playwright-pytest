@@ -52,7 +52,7 @@ def test_browser_context_args(testdir: Any) -> None:
         import pytest
 
         @pytest.fixture(scope="session")
-        def browser_context_args(request):
+        def browser_context_args():
             return {"userAgent": "foobar"}
     """
     )
@@ -187,6 +187,27 @@ def test_django(testdir: Any) -> None:
         def test_one(self):
             self.assertTrue(True)
 
+    """
+    )
+    result = testdir.runpytest()
+    result.assert_outcomes(passed=1)
+
+
+def test_device_emulation(testdir: Any) -> None:
+    testdir.makeconftest(
+        """
+        import pytest
+
+        @pytest.fixture(scope="session")
+        def browser_context_args(browser_context_args, playwright):
+            iphone_11 = playwright.devices['iPhone 11 Pro']
+            return {**browser_context_args, **iphone_11}
+    """
+    )
+    testdir.makepyfile(
+        """
+        def test_browser_context_args(page):
+            assert "iPhone" in page.evaluate("window.navigator.userAgent")
     """
     )
     result = testdir.runpytest()

@@ -8,7 +8,7 @@ Write end-to-end tests for your web apps with [Playwright](https://github.com/mi
 
 ## Usage
 
-```
+```txt
 pip install pytest-playwright
 ```
 
@@ -38,6 +38,7 @@ pytest --browser chromium --browser webkit
 ```
 
 If you want to add the CLI arguments automatically without specifying them, you can use the [pytest.ini](https://docs.pytest.org/en/stable/reference.html#ini-options-ref) file:
+
 ```ini
 # content of pytest.ini
 [pytest]
@@ -46,8 +47,8 @@ addopts = --headful --browser firefox
 
 ```
 
-
 ## Fixtures
+
 This plugin configures Playwright-specific [fixtures for pytest](https://docs.pytest.org/en/latest/fixture.html). To use these fixtures, use the fixture name as an argument to the test function.
 
 ```py
@@ -74,7 +75,7 @@ def test_my_app_is_working(fixture_name):
 
 ## Examples
 
-#### Configure Mypy typings for auto-completion
+### Configure Mypy typings for auto-completion
 
 ```py
 from playwright.sync_api import Page
@@ -84,7 +85,7 @@ def test_visit_admin_dashboard(page: Page):
     # ...
 ```
 
-#### Skip test by browser
+### Skip test by browser
 
 ```py
 import pytest
@@ -95,7 +96,7 @@ def test_visit_example(page):
     # ...
 ```
 
-#### Run on a specific browser
+### Run on a specific browser
 
 ```py
 import pytest
@@ -106,9 +107,9 @@ def test_visit_example(page):
     # ...
 ```
 
-#### Configure base-url
+### Configure base-url
 
-Start Pytest with the `base-url` argument. 
+Start Pytest with the `base-url` argument.
 
 ```sh
 pytest --base-url http://localhost:8080
@@ -120,7 +121,7 @@ def test_visit_example(page):
     # -> Will result in http://localhost:8080/admin
 ```
 
-#### Ignore HTTPS errors
+### Ignore HTTPS errors
 
 conftest.py
 
@@ -135,8 +136,7 @@ def browser_context_args(browser_context_args):
     }
 ```
 
-
-#### Use custom viewport size
+### Use custom viewport size
 
 conftest.py
 
@@ -154,9 +154,26 @@ def browser_context_args(browser_context_args):
     }
 ```
 
+### Device emulation
+
+conftest.py
+
+```py
+import pytest
+
+@pytest.fixture(scope="session")
+def browser_context_args(browser_context_args, playwright):
+    iphone_11 = playwright.devices['iPhone 11 Pro']
+    return {
+        **browser_context_args,
+        **iphone_11,
+    }
+```
+
 ## Debugging
 
-#### Use with pdb
+### Use with pdb
+
 Use the `breakpoint()` statement in your test code to pause execution and get a [pdb](https://docs.python.org/3/library/pdb.html) REPL.
 
 ```py
@@ -166,7 +183,7 @@ def test_bing_is_working(page):
     # ...
 ```
 
-#### Screenshot on test failure
+### Screenshot on test failure
 
 You can capture screenshots for failed tests with a [pytest runtest hook](https://docs.pytest.org/en/6.1.0/reference.html?highlight=pytest_runtest_makereport#test-running-runtest-hooks). Add this to your `conftest.py` file.
 
@@ -187,6 +204,7 @@ def pytest_runtest_makereport(item, call) -> None:
 ```
 
 ## Deploy to CI
+
 Use the [Playwright GitHub Action](https://github.com/microsoft/playwright-github-action) or [guides for other CI providers](https://playwright.dev/#path=docs%2Fci.md&q=) to deploy your tests to CI/CD
 
 ## Special thanks
