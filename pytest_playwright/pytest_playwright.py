@@ -43,26 +43,31 @@ def pytest_configure(config: Any) -> None:
     )
 
 
-def _get_skiplist(request: Any, values: List[str], value_name: str) -> List[str]:
+def _get_skiplist(item: Any, values: List[str], value_name: str) -> List[str]:
     skipped_values: List[str] = []
     # Allowlist
-    only_marker = request.node.get_closest_marker(f"only_{value_name}")
+    only_marker = item.get_closest_marker(f"only_{value_name}")
     if only_marker:
         skipped_values = values
         skipped_values.remove(only_marker.args[0])
 
     # Denylist
-    skip_marker = request.node.get_closest_marker(f"skip_{value_name}")
+    skip_marker = item.get_closest_marker(f"skip_{value_name}")
     if skip_marker:
         skipped_values.append(skip_marker.args[0])
 
     return skipped_values
 
 
-@pytest.fixture(autouse=True)
-def skip_browsers(request: Any, browser_name: str) -> None:
+def pytest_runtest_setup(item: Any) -> None:
+    if not hasattr(item, "callspec"):
+        return
+    browser_name = item.callspec.params.get("browser_name")
+    if not browser_name:
+        return
+
     skip_browsers_names = _get_skiplist(
-        request, ["chromium", "firefox", "webkit"], "browser"
+        item, ["chromium", "firefox", "webkit"], "browser"
     )
 
     if browser_name in skip_browsers_names:

@@ -155,6 +155,29 @@ def test_only_browser(testdir: Any) -> None:
     result.assert_outcomes(passed=1, skipped=2)
 
 
+def test_parameterization(testdir: Any) -> None:
+    testdir.makepyfile(
+        """
+        def test_all_browsers(page):
+            pass
+
+        def test_without_browser():
+            pass
+    """
+    )
+    result = testdir.runpytest(
+        "--verbose",
+        "--browser",
+        "chromium",
+        "--browser",
+        "firefox",
+        "--browser",
+        "webkit",
+    )
+    result.assert_outcomes(passed=4)
+    assert "test_without_browser PASSED" in "\n".join(result.outlines)
+
+
 def test_headful(testdir: Any) -> None:
     testdir.makepyfile(
         """
