@@ -34,10 +34,6 @@ jobs:
     - name: Test
       if: ${{ matrix.os != 'ubuntu-latest' }}
       run: pytest --cov=pytest_playwright --cov-report xml
-      env:
-        DJANGO_SETTINGS_MODULE: tests.assets.django.settings
     - name: Test on Linux
       if: ${{ matrix.os == 'ubuntu-latest' }}
       run: xvfb-run pytest --cov=pytest_playwright --cov-report xml
-      env:
-        DJANGO_SETTINGS_MODULE: tests.assets.django.settings
