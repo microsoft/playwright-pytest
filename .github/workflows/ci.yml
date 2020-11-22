@@ -28,9 +28,7 @@ jobs:
         python -m playwright install
     - name: Lint
       run: |
-        black --check .
-        mypy .
-        flake8 pytest_playwright tests
+        pre-commit run --all-files
     - name: Test
       if: ${{ matrix.os != 'ubuntu-latest' }}
       run: pytest --cov=pytest_playwright --cov-report xml
