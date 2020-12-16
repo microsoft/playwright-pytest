@@ -20,7 +20,6 @@ import pytest
 
 from playwright import sync_playwright
 from playwright.sync_api import Browser, BrowserContext, Page
-from playwright.main import SyncPlaywright
 
 
 def pytest_generate_tests(metafunc: Any) -> None:
@@ -92,7 +91,7 @@ def browser_context_args() -> Dict:
 
 
 @pytest.fixture(scope="session")
-def playwright() -> Generator[SyncPlaywright, None, None]:
+def playwright() -> Generator[Any, None, None]:
     pw = sync_playwright().start()
     yield pw
     pw.stop()
@@ -101,7 +100,7 @@ def playwright() -> Generator[SyncPlaywright, None, None]:
 @pytest.fixture(scope="session")
 def launch_browser(
     pytestconfig: Any,
-    playwright: SyncPlaywright,
+    playwright: Any,
     browser_type_launch_args: Dict,
     browser_name: str,
 ) -> Callable[..., Browser]:
