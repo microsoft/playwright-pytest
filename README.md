@@ -17,7 +17,7 @@ Use the `page` fixture to write a basic test. See [more examples](#examples).
 ```py
 def test_example_is_working(page):
     page.goto("https://example.com")
-    assert page.innerText('h1') == 'Example Domain'
+    assert page.inner_text('h1') == 'Example Domain'
     page.click("text=More information")
 ```
 
@@ -70,8 +70,8 @@ def test_my_app_is_working(fixture_name):
 
 **Customizing fixture options**: For `browser` and `context` fixtures, use the the following fixtures to define custom launch options.
 
-- `browser_type_launch_args`: Override launch arguments for [`browserType.launch()`](https://playwright.dev/#path=docs%2Fapi.md&q=browsertypelaunchoptions). It should return a Dict.
-- `browser_context_args`: Override the options for [`browser.newContext()`](https://playwright.dev/#path=docs%2Fapi.md&q=browsernewcontextoptions). It should return a Dict.
+- `browser_type_launch_args`: Override launch arguments for [`browser_type.launch()`](https://playwright.dev/#path=docs%2Fapi.md&q=browsertypelaunchoptions). It should return a Dict.
+- `browser_context_args`: Override the options for [`browser.new_context()`](https://playwright.dev/#path=docs%2Fapi.md&q=browsernewcontextoptions). It should return a Dict.
 
 ## Examples
 
