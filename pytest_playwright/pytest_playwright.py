@@ -12,14 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from asyncio.events import AbstractEventLoop
-from typing import Any, Callable, Dict, Generator, List
 import asyncio
+from asyncio import AbstractEventLoop
+from typing import Any, Callable, Dict, Generator, List
 
 import pytest
-
 from playwright import sync_playwright
-from playwright.sync_api import Browser, BrowserContext, Page
+from playwright.sync_api import Browser, BrowserContext, Page, Playwright
 
 
 def pytest_generate_tests(metafunc: Any) -> None:
@@ -76,8 +75,10 @@ def pytest_runtest_setup(item: Any) -> None:
 @pytest.fixture(scope="session")
 def event_loop() -> Generator[AbstractEventLoop, None, None]:
     loop = asyncio.get_event_loop()
-    yield loop
-    loop.close()
+    try:
+        yield loop
+    finally:
+        loop.close()
 
 
 @pytest.fixture(scope="session")
@@ -91,10 +92,12 @@ def browser_context_args() -> Dict:
 
 
 @pytest.fixture(scope="session")
-def playwright() -> Generator[Any, None, None]:
+def playwright() -> Generator[Playwright, None, None]:
     pw = sync_playwright().start()
-    yield pw
-    pw.stop()
+    try:
+        yield pw
+    finally:
+        pw.stop()
 
 
 @pytest.fixture(scope="session")
@@ -118,8 +121,10 @@ def launch_browser(
 @pytest.fixture(scope="session")
 def browser(launch_browser: Callable[[], Browser]) -> Generator[Browser, None, None]:
     browser = launch_browser()
-    yield browser
-    browser.close()
+    try:
+        yield browser
+    finally:
+        browser.close()
 
 
 @pytest.fixture
@@ -127,8 +132,10 @@ def context(
     browser: Browser, browser_context_args: Dict
 ) -> Generator[BrowserContext, None, None]:
     context = browser.newContext(**browser_context_args)
-    yield context
-    context.close()
+    try:
+        yield context
+    finally:
+        context.close()
 
 
 def _handle_page_goto(
@@ -147,8 +154,10 @@ def page(context: BrowserContext, base_url: str) -> Generator[Page, None, None]:
     page.goto = lambda *args, **kwargs: _handle_page_goto(  # type: ignore
         page, list(args), kwargs, base_url
     )
-    yield page
-    page.close()
+    try:
+        yield page
+    finally:
+        page.close()
 
 
 @pytest.fixture(scope="session")
