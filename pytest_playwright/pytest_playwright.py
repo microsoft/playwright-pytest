@@ -18,8 +18,7 @@ import asyncio
 
 import pytest
 
-from playwright import sync_playwright
-from playwright.sync_api import Browser, BrowserContext, Page
+from playwright.sync_api import sync_playwright, Browser, BrowserContext, Page
 
 
 def pytest_generate_tests(metafunc: Any) -> None:
@@ -126,7 +125,7 @@ def browser(launch_browser: Callable[[], Browser]) -> Generator[Browser, None, N
 def context(
     browser: Browser, browser_context_args: Dict
 ) -> Generator[BrowserContext, None, None]:
-    context = browser.newContext(**browser_context_args)
+    context = browser.new_context(**browser_context_args)
     yield context
     context.close()
 
@@ -142,7 +141,7 @@ def _handle_page_goto(
 
 @pytest.fixture
 def page(context: BrowserContext, base_url: str) -> Generator[Page, None, None]:
-    page = context.newPage()
+    page = context.new_page()
     page._goto = page.goto  # type: ignore
     page.goto = lambda *args, **kwargs: _handle_page_goto(  # type: ignore
         page, list(args), kwargs, base_url
