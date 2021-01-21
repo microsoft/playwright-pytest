@@ -69,8 +69,8 @@ def test_my_app_is_working(fixture_name):
 
 **Customizing fixture options**: For `browser` and `context` fixtures, use the the following fixtures to define custom launch options.
 
-- `browser_type_launch_args`: Override launch arguments for [`browserType.launch()`](https://playwright.dev/docs/api/class-browsertype#browsertypelaunchoptions). It should return a Dict.
-- `browser_context_args`: Override the options for [`browser.new_context()`](https://playwright.dev/docs/api/class-browser#browsernewcontextoptions). It should return a Dict.
+- `browser_type_launch_args`: Override launch arguments for [`browserType.launch()`](https://playwright.dev/python/docs/api/class-browsertype#browser_typelaunchoptions). It should return a Dict.
+- `browser_context_args`: Override the options for [`browser.new_context()`](https://playwright.dev/python/docs/api/class-browser#browsernew_contextoptions). It should return a Dict.
 
 ## Examples
 
