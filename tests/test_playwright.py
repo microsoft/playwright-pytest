@@ -24,8 +24,8 @@ def test_default(testdir: Any) -> None:
             assert browser_name == "chromium"
             user_agent = page.evaluate("window.navigator.userAgent")
             assert "HeadlessChrome" in user_agent
-            page.setContent('<span id="foo">bar</span>')
-            assert page.querySelector("#foo")
+            page.set_content('<span id="foo">bar</span>')
+            assert page.query_selector("#foo")
     """
     )
     result = testdir.runpytest()
@@ -36,8 +36,8 @@ def test_multiple_browsers(testdir: Any) -> None:
     testdir.makepyfile(
         """
         def test_multiple_browsers(page):
-            page.setContent('<span id="foo">bar</span>')
-            assert page.querySelector("#foo")
+            page.set_content('<span id="foo">bar</span>')
+            assert page.query_selector("#foo")
     """
     )
     result = testdir.runpytest(
@@ -53,7 +53,7 @@ def test_browser_context_args(testdir: Any) -> None:
 
         @pytest.fixture(scope="session")
         def browser_context_args():
-            return {"userAgent": "foobar"}
+            return {"user_agent": "foobar"}
     """
     )
     testdir.makepyfile(

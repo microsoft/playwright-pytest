@@ -17,7 +17,7 @@ Use the `page` fixture to write a basic test. See [more examples](#examples).
 ```py
 def test_example_is_working(page):
     page.goto("https://example.com")
-    assert page.innerText('h1') == 'Example Domain'
+    assert page.inner_text('h1') == 'Example Domain'
     page.click("text=More information")
 ```
 
@@ -44,7 +44,6 @@ If you want to add the CLI arguments automatically without specifying them, you 
 [pytest]
 # Run firefox with UI
 addopts = --headful --browser firefox
-
 ```
 
 ## Fixtures
@@ -59,8 +58,8 @@ def test_my_app_is_working(fixture_name):
 
 **Function scope**: These fixtures are created when requested in a test function and destroyed when the test ends.
 
-- `context`: New [browser context](https://playwright.dev/#path=docs%2Fcore-concepts.md&q=browser-contexts) for a test.
-- `page`: New [browser page](https://playwright.dev/#path=docs%2Fcore-concepts.md&q=pages-and-frames) for a test.
+- `context`: New [browser context](https://playwright.dev/python/docs/core-concepts#browser-contexts) for a test.
+- `page`: New [browser page](https://playwright.dev/python/docs/core-concepts#pages-and-frames) for a test.
 
 **Session scope**: These fixtures are created when requested in a test function and destroyed when all tests end.
 
@@ -70,8 +69,8 @@ def test_my_app_is_working(fixture_name):
 
 **Customizing fixture options**: For `browser` and `context` fixtures, use the the following fixtures to define custom launch options.
 
-- `browser_type_launch_args`: Override launch arguments for [`browserType.launch()`](https://playwright.dev/#path=docs%2Fapi.md&q=browsertypelaunchoptions). It should return a Dict.
-- `browser_context_args`: Override the options for [`browser.newContext()`](https://playwright.dev/#path=docs%2Fapi.md&q=browsernewcontextoptions). It should return a Dict.
+- `browser_type_launch_args`: Override launch arguments for [`browserType.launch()`](https://playwright.dev/python/docs/api/class-browsertype#browser_typelaunchoptions). It should return a Dict.
+- `browser_context_args`: Override the options for [`browser.new_context()`](https://playwright.dev/python/docs/api/class-browser#browsernew_contextoptions). It should return a Dict.
 
 ## Examples
 
@@ -132,7 +131,7 @@ import pytest
 def browser_context_args(browser_context_args):
     return {
         **browser_context_args,
-        "ignoreHTTPSErrors": True
+        "ignore_https_errors": True
     }
 ```
 
@@ -205,7 +204,7 @@ def pytest_runtest_makereport(item, call) -> None:
 
 ## Deploy to CI
 
-Use the [Playwright GitHub Action](https://github.com/microsoft/playwright-github-action) or [guides for other CI providers](https://playwright.dev/#path=docs%2Fci.md&q=) to deploy your tests to CI/CD
+Use the [Playwright GitHub Action](https://github.com/microsoft/playwright-github-action) or [guides for other CI providers](https://playwright.dev/python/docs/ci) to deploy your tests to CI/CD
 
 ## Special thanks
 
