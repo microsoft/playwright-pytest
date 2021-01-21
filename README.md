@@ -58,8 +58,8 @@ def test_my_app_is_working(fixture_name):
 
 **Function scope**: These fixtures are created when requested in a test function and destroyed when the test ends.
 
-- `context`: New [browser context](https://playwright.dev/docs/core-concepts/#browser-contexts) for a test.
-- `page`: New [browser page](https://playwright.dev/docs/core-concepts/#pages-and-frames) for a test.
+- `context`: New [browser context](https://playwright.dev/python/docs/core-concepts#browser-contexts) for a test.
+- `page`: New [browser page](https://playwright.dev/python/docs/core-concepts/#pages-and-frames) for a test.
 
 **Session scope**: These fixtures are created when requested in a test function and destroyed when all tests end.
 
@@ -204,7 +204,7 @@ def pytest_runtest_makereport(item, call) -> None:
 
 ## Deploy to CI
 
-Use the [Playwright GitHub Action](https://github.com/microsoft/playwright-github-action) or [guides for other CI providers](https://playwright.dev/docs/ci/) to deploy your tests to CI/CD
+Use the [Playwright GitHub Action](https://github.com/microsoft/playwright-github-action) or [guides for other CI providers](https://playwright.dev/python/docs/ci) to deploy your tests to CI/CD
 
 ## Special thanks
 
