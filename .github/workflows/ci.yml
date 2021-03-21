@@ -27,7 +27,7 @@ jobs:
         pip install -e .
         python -m playwright install
     - name: Lint
-      run: pre-commit run --all-files
+      uses: pre-commit/action@v2.0.0
     - name: Test
       if: ${{ matrix.os != 'ubuntu-latest' }}
       run: pytest --cov=pytest_playwright --cov-report xml

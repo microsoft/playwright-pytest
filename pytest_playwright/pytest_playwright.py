@@ -12,13 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from asyncio.events import AbstractEventLoop
-from typing import Any, Callable, Dict, Generator, List
 import asyncio
+from asyncio import AbstractEventLoop
+from typing import Any, Callable, Dict, Generator, List, Optional
 
 import pytest
-
-from playwright.sync_api import sync_playwright, Browser, BrowserContext, Page
+from playwright.sync_api import (
+    Browser,
+    BrowserContext,
+    Page,
+    Playwright,
+    sync_playwright,
+)
 
 
 def pytest_generate_tests(metafunc: Any) -> None:
@@ -90,7 +95,7 @@ def browser_context_args() -> Dict:
 
 
 @pytest.fixture(scope="session")
-def playwright() -> Generator[Any, None, None]:
+def playwright() -> Generator[Playwright, None, None]:
     pw = sync_playwright().start()
     yield pw
     pw.stop()
@@ -99,13 +104,16 @@ def playwright() -> Generator[Any, None, None]:
 @pytest.fixture(scope="session")
 def launch_browser(
     pytestconfig: Any,
-    playwright: Any,
+    playwright: Playwright,
     browser_type_launch_args: Dict,
     browser_name: str,
 ) -> Callable[..., Browser]:
-    def launch(**kwargs: Dict[Any, Any]) -> Browser:
+    def launch(**kwargs: Dict) -> Browser:
         headful_option = pytestconfig.getoption("--headful")
+        browser_channel_option = pytestconfig.getoption("--browser-channel")
         launch_options = {**browser_type_launch_args, **kwargs}
+        if browser_channel_option:
+            launch_options["channel"] = browser_channel_option
         if headful_option:
             launch_options["headless"] = False
         browser = getattr(playwright, browser_name).launch(**launch_options)
@@ -170,6 +178,11 @@ def browser_name() -> None:
     return None
 
 
+@pytest.fixture(scope="session")
+def browser_channel(pytestconfig: Any) -> Optional[str]:
+    return pytestconfig.getoption("--browser-channel")
+
+
 def pytest_addoption(parser: Any) -> None:
     group = parser.getgroup("playwright", "Playwright")
     group.addoption(
@@ -178,9 +191,15 @@ def pytest_addoption(parser: Any) -> None:
         default=[],
         help="Browser engine which should be used",
     )
-    parser.addoption(
+    group.addoption(
         "--headful",
         action="store_true",
         default=False,
         help="Run tests in headful mode.",
+    )
+    group.addoption(
+        "--browser-channel",
+        action="store",
+        default=None,
+        help="Browser channel to be used.",
     )

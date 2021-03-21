@@ -12,7 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import sys
 from typing import Any
+
+import pytest
 
 
 def test_default(testdir: Any) -> None:
@@ -30,6 +33,46 @@ def test_default(testdir: Any) -> None:
     )
     result = testdir.runpytest()
     result.assert_outcomes(passed=1)
+
+
+@pytest.mark.parametrize(
+    "channel",
+    [
+        "chrome",
+        "msedge",
+    ],
+)
+def test_browser_channel(channel: str, testdir: Any) -> None:
+    if channel == "msedge" and sys.platform == "linux":
+        pytest.skip("msedge not supported on linux")
+    testdir.makepyfile(
+        f"""
+        import pytest
+
+        def test_browser_channel(page, browser_name, browser_channel):
+            assert browser_name == "chromium"
+            assert browser_channel == "{channel}"
+    """
+    )
+    result = testdir.runpytest("--browser-channel", channel)
+    result.assert_outcomes(passed=1)
+
+
+def test_invalid_browser_channel(testdir: Any) -> None:
+    testdir.makepyfile(
+        """
+        import pytest
+
+        def test_browser_channel(page, browser_name, browser_channel):
+            assert browser_name == "chromium"
+    """
+    )
+    result = testdir.runpytest("--browser-channel", "not-exists")
+    result.assert_outcomes(errors=1)
+    assert (
+        "channel: expected one of (chrome|chrome-beta|chrome-dev|chrome-canary|msedge|msedge-beta|msedge-dev|msedge-canary)"
+        in "\n".join(result.outlines)
+    )
 
 
 def test_multiple_browsers(testdir: Any) -> None:
