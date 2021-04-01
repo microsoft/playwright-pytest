@@ -110,12 +110,15 @@ def launch_browser(
 ) -> Callable[..., Browser]:
     def launch(**kwargs: Dict) -> Browser:
         headful_option = pytestconfig.getoption("--headful")
+        slowmo_option = pytestconfig.getoption("--slowmo")
         browser_channel_option = pytestconfig.getoption("--browser-channel")
         launch_options = {**browser_type_launch_args, **kwargs}
         if browser_channel_option:
             launch_options["channel"] = browser_channel_option
         if headful_option:
             launch_options["headless"] = False
+        if slowmo_option:
+            launch_options["slow_mo"] = slowmo_option
         browser = getattr(playwright, browser_name).launch(**launch_options)
         return browser
 
@@ -202,4 +205,10 @@ def pytest_addoption(parser: Any) -> None:
         action="store",
         default=None,
         help="Browser channel to be used.",
+    )
+    group.addoption(
+        "--slowmo",
+        default=0,
+        type=int,
+        help="Run tests in slow mo",
     )

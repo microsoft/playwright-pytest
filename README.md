@@ -84,6 +84,14 @@ def test_visit_admin_dashboard(page: Page):
     # ...
 ```
 
+### Configure slow mo
+
+Run tests with slow mo with the `--slowmo` argument.
+
+```bash
+pytest --slowmo 100
+```
+
 ### Skip test by browser
 
 ```py

@@ -35,6 +35,23 @@ def test_default(testdir: Any) -> None:
     result.assert_outcomes(passed=1)
 
 
+def test_slowmo(testdir: Any) -> None:
+    testdir.makepyfile(
+        """
+        from time import monotonic
+        def test_slowmo(page):
+            start_time = monotonic()
+            email = "test@test.com"
+            page.goto("https://google.com")
+            page.type("input[name=q]", email)
+            end_time = monotonic()
+            assert end_time - start_time >= len(email)
+    """
+    )
+    result = testdir.runpytest("--browser", "chromium", "--slowmo", "1000", "--headful")
+    result.assert_outcomes(passed=1)
+
+
 @pytest.mark.parametrize(
     "channel",
     [
