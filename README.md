@@ -106,8 +106,7 @@ def test_visit_example(page):
     # ...
 ```
 
-### Run on chromium browser channel
-Start Pytest with `--browser-channel` argument.
+### Run with a custom browser channel like Google Chrome or Microsoft Edge
 
 ```sh
 pytest --browser-channel chrome # or chrome-beta, chrome-dev, chrome-canary, msedge, msedge-beta, msedge-dev, msedge-canary
