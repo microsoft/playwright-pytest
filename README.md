@@ -106,6 +106,17 @@ def test_visit_example(page):
     # ...
 ```
 
+### Run with a custom browser channel like Google Chrome or Microsoft Edge
+
+```sh
+pytest --browser-channel chrome # or chrome-beta, chrome-dev, chrome-canary, msedge, msedge-beta, msedge-dev, msedge-canary
+```
+
+```python
+def test_example(page):
+    page.goto("https://example.com")
+```
+
 ### Configure base-url
 
 Start Pytest with the `base-url` argument.
