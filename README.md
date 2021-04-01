@@ -3,7 +3,7 @@
 Write end-to-end tests for your web apps with [Playwright](https://github.com/microsoft/playwright-python) and [pytest](https://docs.pytest.org/en/stable/).
 
 - Support for **all modern browsers** including Chromium, WebKit and Firefox.
-- Support for **headless and headful** execution.
+- Support for **headless and headed** execution.
 - **Built-in fixtures** that provide browser primitives to test functions.
 
 ## Usage
@@ -27,8 +27,8 @@ To run your tests, use pytest CLI.
 # Run tests (Chromium and headless by default)
 pytest
 
-# Run tests in headful mode
-pytest --headful
+# Run tests in headed mode
+pytest --headed
 
 # Run tests in a different browser (chromium, firefox, webkit)
 pytest --browser firefox
@@ -43,7 +43,7 @@ If you want to add the CLI arguments automatically without specifying them, you 
 # content of pytest.ini
 [pytest]
 # Run firefox with UI
-addopts = --headful --browser firefox
+addopts = --headed --browser firefox
 ```
 
 ## Fixtures

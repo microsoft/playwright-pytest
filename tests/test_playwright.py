@@ -42,13 +42,13 @@ def test_slowmo(testdir: Any) -> None:
         def test_slowmo(page):
             start_time = monotonic()
             email = "test@test.com"
-            page.goto("https://google.com")
-            page.type("input[name=q]", email)
+            page.set_content("<input type='text'/>")
+            page.type("input", email)
             end_time = monotonic()
             assert end_time - start_time >= len(email)
     """
     )
-    result = testdir.runpytest("--browser", "chromium", "--slowmo", "1000", "--headful")
+    result = testdir.runpytest("--browser", "chromium", "--slowmo", "1000", "--headed")
     result.assert_outcomes(passed=1)
 
 
@@ -238,7 +238,7 @@ def test_parameterization(testdir: Any) -> None:
     assert "test_without_browser PASSED" in "\n".join(result.outlines)
 
 
-def test_headful(testdir: Any) -> None:
+def test_headed(testdir: Any) -> None:
     testdir.makepyfile(
         """
         def test_base_url(page, browser_name):
@@ -246,7 +246,7 @@ def test_headful(testdir: Any) -> None:
             assert "HeadlessChrome" not in user_agent
     """
     )
-    result = testdir.runpytest("--browser", "chromium", "--headful")
+    result = testdir.runpytest("--browser", "chromium", "--headed")
     result.assert_outcomes(passed=1)
 
 
