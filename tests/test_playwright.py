@@ -86,10 +86,7 @@ def test_invalid_browser_channel(testdir: Any) -> None:
     )
     result = testdir.runpytest("--browser-channel", "not-exists")
     result.assert_outcomes(errors=1)
-    assert (
-        "channel: expected one of (chrome|chrome-beta|chrome-dev|chrome-canary|msedge|msedge-beta|msedge-dev|msedge-canary)"
-        in "\n".join(result.outlines)
-    )
+    assert "channel: expected one of " in "\n".join(result.outlines)
 
 
 def test_multiple_browsers(testdir: Any) -> None:
