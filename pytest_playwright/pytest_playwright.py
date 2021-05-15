@@ -23,6 +23,7 @@ from playwright.sync_api import (
     Page,
     Playwright,
     sync_playwright,
+    BrowserType,
 )
 
 
@@ -85,8 +86,18 @@ def event_loop() -> Generator[AbstractEventLoop, None, None]:
 
 
 @pytest.fixture(scope="session")
-def browser_type_launch_args() -> Dict:
-    return {}
+def browser_type_launch_args(pytestconfig: Any) -> Dict:
+    launch_options = {}
+    headed_option = pytestconfig.getoption("--headed")
+    if headed_option:
+        launch_options["headless"] = False
+    browser_channel_option = pytestconfig.getoption("--browser-channel")
+    if browser_channel_option:
+        launch_options["channel"] = browser_channel_option
+    slowmo_option = pytestconfig.getoption("--slowmo")
+    if slowmo_option:
+        launch_options["slow_mo"] = slowmo_option
+    return launch_options
 
 
 @pytest.fixture(scope="session")
@@ -102,26 +113,19 @@ def playwright() -> Generator[Playwright, None, None]:
 
 
 @pytest.fixture(scope="session")
+def browser_type(playwright: Playwright, browser_name: str) -> BrowserType:
+    return getattr(playwright, browser_name)
+
+
+@pytest.fixture(scope="session")
 def launch_browser(
-    pytestconfig: Any,
     playwright: Playwright,
     browser_type_launch_args: Dict,
-    browser_name: str,
+    browser_type: BrowserType,
 ) -> Callable[..., Browser]:
     def launch(**kwargs: Dict) -> Browser:
         launch_options = {**browser_type_launch_args, **kwargs}
-
-        headed_option = pytestconfig.getoption("--headed")
-        if headed_option:
-            launch_options["headless"] = False
-        browser_channel_option = pytestconfig.getoption("--browser-channel")
-        if browser_channel_option:
-            launch_options["channel"] = browser_channel_option
-        slowmo_option = pytestconfig.getoption("--slowmo")
-        if slowmo_option:
-            launch_options["slow_mo"] = slowmo_option
-
-        browser = getattr(playwright, browser_name).launch(**launch_options)
+        browser = browser_type.launch(**launch_options)
         return browser
 
     return launch
