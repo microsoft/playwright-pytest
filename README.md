@@ -15,6 +15,7 @@ pip install pytest-playwright
 Use the `page` fixture to write a basic test. See [more examples](#examples).
 
 ```py
+# test_my_application.py
 def test_example_is_working(page):
     page.goto("https://example.com")
     assert page.inner_text('h1') == 'Example Domain'
@@ -77,6 +78,7 @@ def test_my_app_is_working(fixture_name):
 ### Configure Mypy typings for auto-completion
 
 ```py
+# test_my_application.py
 from playwright.sync_api import Page
 
 def test_visit_admin_dashboard(page: Page):
@@ -95,6 +97,7 @@ pytest --slowmo 100
 ### Skip test by browser
 
 ```py
+# test_my_application.py
 import pytest
 
 @pytest.mark.skip_browser("firefox")
@@ -106,6 +109,7 @@ def test_visit_example(page):
 ### Run on a specific browser
 
 ```py
+# conftest.py
 import pytest
 
 @pytest.mark.only_browser("chromium")
@@ -121,6 +125,7 @@ pytest --browser-channel chrome # or chrome-beta, chrome-dev, chrome-canary, mse
 ```
 
 ```python
+# test_my_application.py
 def test_example(page):
     page.goto("https://example.com")
 ```
@@ -134,6 +139,7 @@ pytest --base-url http://localhost:8080
 ```
 
 ```py
+# test_my_application.py
 def test_visit_example(page):
     page.goto("/admin")
     # -> Will result in http://localhost:8080/admin
@@ -141,9 +147,8 @@ def test_visit_example(page):
 
 ### Ignore HTTPS errors
 
-conftest.py
-
 ```py
+# conftest.py
 import pytest
 
 @pytest.fixture(scope="session")
@@ -156,9 +161,8 @@ def browser_context_args(browser_context_args):
 
 ### Use custom viewport size
 
-conftest.py
-
 ```py
+# conftest.py
 import pytest
 
 @pytest.fixture(scope="session")
@@ -174,9 +178,8 @@ def browser_context_args(browser_context_args):
 
 ### Device emulation
 
-conftest.py
-
 ```py
+# conftest.py
 import pytest
 
 @pytest.fixture(scope="session")
@@ -187,6 +190,31 @@ def browser_context_args(browser_context_args, playwright):
         **iphone_11,
     }
 ```
+
+### Persistent context
+
+```py
+# conftest.py
+import pytest
+from playwright.sync_api import BrowserType
+from typing import Dict
+
+@pytest.fixture(scope="session")
+def context(
+    browser_type: BrowserType,
+    browser_type_launch_args: Dict,
+    browser_context_args: Dict
+):
+    context = browser_type.launch_persistent_context("./foobar", **{
+        **browser_type_launch_args,
+        **browser_context_args,
+        "locale": "de-DE",
+    })
+    yield context
+    context.close()
+```
+
+When using that all pages inside your test are created from the persistent context.
 
 ## Debugging
 
@@ -208,7 +236,7 @@ You can capture screenshots for failed tests with a [pytest runtest hook](https:
 Note that this snippet uses `slugify` to convert test names to file paths, which can be installed with `pip install python-slugify`.
 
 ```py
-# In conftest.py
+# conftest.py
 from slugify import slugify
 from pathlib import Path
 
