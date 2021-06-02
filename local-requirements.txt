@@ -1,10 +1,10 @@
-black==21.5b1
+black==21.5b2
 pytest==6.2.4
-pytest-cov==2.12.0
+pytest-cov==2.12.1
 mypy==0.812
-setuptools==56.2.0
+setuptools==57.0.0
 twine==3.4.1
 wheel==0.36.2
 flake8==3.9.2
-pre-commit==2.12.1
-Django==3.2.3
+pre-commit==2.13.0
+Django==3.2.4
