@@ -66,6 +66,7 @@ def test_my_app_is_working(fixture_name):
 
 - `browser`: Browser instance launched by Playwright.
 - `browser_name`: Browser name as string.
+- `browser_channel`: Browser Channel as string.
 - `is_chromium`, `is_webkit`, `is_firefox`: Booleans for the respective browser types.
 
 **Customizing fixture options**: For `browser` and `context` fixtures, use the the following fixtures to define custom launch options.
