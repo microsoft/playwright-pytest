@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import asyncio
+import warnings
 from asyncio import AbstractEventLoop
 from typing import Any, Callable, Dict, Generator, List, Optional
 
@@ -183,8 +184,18 @@ def is_chromium(browser_name: str) -> bool:
 
 
 @pytest.fixture(scope="session")
-def browser_name() -> None:
-    return None
+def browser_name(pytestconfig: Any) -> Optional[str]:
+    # When using unittest.TestCase it won't use pytest_generate_tests
+    # For that we still try to give the user a slightly less feature-rich experience
+    browser_names = pytestconfig.getoption("--browser")
+    if len(browser_names) == 0:
+        return "chromium"
+    if len(browser_names) == 1:
+        return browser_names[0]
+    warnings.warn(
+        "When using unittest.TestCase specifying multiple browsers is not supported"
+    )
+    return browser_names[0]
 
 
 @pytest.fixture(scope="session")

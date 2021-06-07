@@ -217,6 +217,30 @@ def context(
 
 When using that all pages inside your test are created from the persistent context.
 
+### Using with `unittest.TestCase`
+
+See the following example for using it with `unittest.TestCase`. This has a limitation,
+that only a single browser can be specified and no matrix of multiple browsers gets
+generated when specifying multiple.
+
+```py
+import pytest
+import unittest
+
+from playwright.sync_api import Page
+
+
+class MyTest(unittest.TestCase):
+    @pytest.fixture(autouse=True)
+    def setup(self, page: Page):
+        self.page = page
+
+    def test_foobar(self):
+        self.page.goto("https://microsoft.com")
+        self.page.click("#foobar")
+        assert self.page.evaluate("1 + 1") == 2
+```
+
 ## Debugging
 
 ### Use with pdb
