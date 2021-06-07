@@ -13,12 +13,11 @@
 # limitations under the License.
 
 import sys
-from typing import Any
 
 import pytest
 
 
-def test_default(testdir: Any) -> None:
+def test_default(testdir: pytest.Testdir) -> None:
     testdir.makepyfile(
         """
         import pytest
@@ -35,7 +34,7 @@ def test_default(testdir: Any) -> None:
     result.assert_outcomes(passed=1)
 
 
-def test_slowmo(testdir: Any) -> None:
+def test_slowmo(testdir: pytest.Testdir) -> None:
     testdir.makepyfile(
         """
         from time import monotonic
@@ -59,7 +58,7 @@ def test_slowmo(testdir: Any) -> None:
         "msedge",
     ],
 )
-def test_browser_channel(channel: str, testdir: Any) -> None:
+def test_browser_channel(channel: str, testdir: pytest.Testdir) -> None:
     if channel == "msedge" and sys.platform == "linux":
         pytest.skip("msedge not supported on linux")
     testdir.makepyfile(
@@ -75,7 +74,7 @@ def test_browser_channel(channel: str, testdir: Any) -> None:
     result.assert_outcomes(passed=1)
 
 
-def test_invalid_browser_channel(testdir: Any) -> None:
+def test_invalid_browser_channel(testdir: pytest.Testdir) -> None:
     testdir.makepyfile(
         """
         import pytest
@@ -89,7 +88,51 @@ def test_invalid_browser_channel(testdir: Any) -> None:
     assert "channel: expected one of " in "\n".join(result.outlines)
 
 
-def test_multiple_browsers(testdir: Any) -> None:
+def test_unittest_class(testdir: pytest.Testdir) -> None:
+    testdir.makepyfile(
+        """
+        import pytest
+        import unittest
+        from playwright.sync_api import Page
+
+
+        class MyTest(unittest.TestCase):
+            @pytest.fixture(autouse=True)
+            def setup(self, page: Page):
+                self.page = page
+
+            def test_foobar(self):
+                assert self.page.evaluate("1 + 1") == 2
+    """
+    )
+    result = testdir.runpytest("--browser", "chromium")
+    result.assert_outcomes(passed=1)
+
+
+def test_unittest_class_multiple_browsers(testdir: pytest.Testdir) -> None:
+    testdir.makepyfile(
+        """
+        import pytest
+        import unittest
+        from playwright.sync_api import Page
+
+
+        class MyTest(unittest.TestCase):
+            @pytest.fixture(autouse=True)
+            def setup(self, page: Page):
+                self.page = page
+
+            def test_foobar(self):
+                assert "Firefox" in self.page.evaluate("navigator.userAgent")
+                assert self.page.evaluate("1 + 1") == 2
+    """
+    )
+    result = testdir.runpytest("--browser", "firefox", "--browser", "webkit")
+    result.assert_outcomes(passed=1)
+    assert any("multiple browsers is not supported" in line for line in result.outlines)
+
+
+def test_multiple_browsers(testdir: pytest.Testdir) -> None:
     testdir.makepyfile(
         """
         def test_multiple_browsers(page):
@@ -103,7 +146,7 @@ def test_multiple_browsers(testdir: Any) -> None:
     result.assert_outcomes(passed=3)
 
 
-def test_browser_context_args(testdir: Any) -> None:
+def test_browser_context_args(testdir: pytest.Testdir) -> None:
     testdir.makeconftest(
         """
         import pytest
@@ -123,7 +166,7 @@ def test_browser_context_args(testdir: Any) -> None:
     result.assert_outcomes(passed=1)
 
 
-def test_chromium(testdir: Any) -> None:
+def test_chromium(testdir: pytest.Testdir) -> None:
     testdir.makepyfile(
         """
         def test_is_chromium(page, browser_name, is_chromium, is_firefox, is_webkit):
@@ -137,7 +180,7 @@ def test_chromium(testdir: Any) -> None:
     result.assert_outcomes(passed=1)
 
 
-def test_firefox(testdir: Any) -> None:
+def test_firefox(testdir: pytest.Testdir) -> None:
     testdir.makepyfile(
         """
         def test_is_firefox(page, browser_name, is_chromium, is_firefox, is_webkit):
@@ -151,7 +194,7 @@ def test_firefox(testdir: Any) -> None:
     result.assert_outcomes(passed=1)
 
 
-def test_webkit(testdir: Any) -> None:
+def test_webkit(testdir: pytest.Testdir) -> None:
     testdir.makepyfile(
         """
         def test_is_webkit(page, browser_name, is_chromium, is_firefox, is_webkit):
@@ -165,7 +208,7 @@ def test_webkit(testdir: Any) -> None:
     result.assert_outcomes(passed=1)
 
 
-def test_goto(testdir: Any) -> None:
+def test_goto(testdir: pytest.Testdir) -> None:
     testdir.makepyfile(
         """
         def test_base_url(page, base_url):
@@ -180,7 +223,7 @@ def test_goto(testdir: Any) -> None:
     result.assert_outcomes(passed=1)
 
 
-def test_skip_browsers(testdir: Any) -> None:
+def test_skip_browsers(testdir: pytest.Testdir) -> None:
     testdir.makepyfile(
         """
         import pytest
@@ -196,7 +239,7 @@ def test_skip_browsers(testdir: Any) -> None:
     result.assert_outcomes(passed=2, skipped=1)
 
 
-def test_only_browser(testdir: Any) -> None:
+def test_only_browser(testdir: pytest.Testdir) -> None:
     testdir.makepyfile(
         """
         import pytest
@@ -212,7 +255,7 @@ def test_only_browser(testdir: Any) -> None:
     result.assert_outcomes(passed=1, skipped=2)
 
 
-def test_parameterization(testdir: Any) -> None:
+def test_parameterization(testdir: pytest.Testdir) -> None:
     testdir.makepyfile(
         """
         def test_all_browsers(page):
@@ -235,7 +278,7 @@ def test_parameterization(testdir: Any) -> None:
     assert "test_without_browser PASSED" in "\n".join(result.outlines)
 
 
-def test_headed(testdir: Any) -> None:
+def test_headed(testdir: pytest.Testdir) -> None:
     testdir.makepyfile(
         """
         def test_base_url(page, browser_name):
@@ -247,7 +290,7 @@ def test_headed(testdir: Any) -> None:
     result.assert_outcomes(passed=1)
 
 
-def test_invalid_browser_name(testdir: Any) -> None:
+def test_invalid_browser_name(testdir: pytest.Testdir) -> None:
     testdir.makepyfile(
         """
         def test_base_url(page):
@@ -259,7 +302,7 @@ def test_invalid_browser_name(testdir: Any) -> None:
     assert "'test123' is not allowed" in "\n".join(result.outlines)
 
 
-def test_django(testdir: Any) -> None:
+def test_django(testdir: pytest.Testdir) -> None:
     testdir.makepyfile(
         """
     from django.test import TestCase
@@ -273,7 +316,7 @@ def test_django(testdir: Any) -> None:
     result.assert_outcomes(passed=1)
 
 
-def test_device_emulation(testdir: Any) -> None:
+def test_device_emulation(testdir: pytest.Testdir) -> None:
     testdir.makeconftest(
         """
         import pytest
@@ -294,7 +337,7 @@ def test_device_emulation(testdir: Any) -> None:
     result.assert_outcomes(passed=1)
 
 
-def test_launch_persistent_context(testdir: Any) -> None:
+def test_launch_persistent_context(testdir: pytest.Testdir) -> None:
     testdir.makeconftest(
         """
         import pytest
