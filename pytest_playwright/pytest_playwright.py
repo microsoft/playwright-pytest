@@ -18,6 +18,10 @@ from asyncio import AbstractEventLoop
 from typing import Any, Callable, Dict, Generator, List, Optional
 
 import pytest
+from pytest import Item
+from _pytest.config import Config
+from _pytest.config.argparsing import Parser
+from _pytest.python import Metafunc
 from playwright.sync_api import (
     Browser,
     BrowserContext,
@@ -28,7 +32,7 @@ from playwright.sync_api import (
 )
 
 
-def pytest_generate_tests(metafunc: Any) -> None:
+def pytest_generate_tests(metafunc: Metafunc) -> None:
     if "browser_name" in metafunc.fixturenames:
         browsers = metafunc.config.option.browser or ["chromium"]
         for browser in browsers:
@@ -39,7 +43,7 @@ def pytest_generate_tests(metafunc: Any) -> None:
         metafunc.parametrize("browser_name", browsers, scope="session")
 
 
-def pytest_configure(config: Any) -> None:
+def pytest_configure(config: Config) -> None:
     config.addinivalue_line(
         "markers", "skip_browser(name): mark test to be skipped a specific browser"
     )
@@ -48,7 +52,7 @@ def pytest_configure(config: Any) -> None:
     )
 
 
-def _get_skiplist(item: Any, values: List[str], value_name: str) -> List[str]:
+def _get_skiplist(item: Item, values: List[str], value_name: str) -> List[str]:
     skipped_values: List[str] = []
     # Allowlist
     only_marker = item.get_closest_marker(f"only_{value_name}")
@@ -64,7 +68,7 @@ def _get_skiplist(item: Any, values: List[str], value_name: str) -> List[str]:
     return skipped_values
 
 
-def pytest_runtest_setup(item: Any) -> None:
+def pytest_runtest_setup(item: Item) -> None:
     if not hasattr(item, "callspec"):
         return
     browser_name = item.callspec.params.get("browser_name")
@@ -87,7 +91,7 @@ def event_loop() -> Generator[AbstractEventLoop, None, None]:
 
 
 @pytest.fixture(scope="session")
-def browser_type_launch_args(pytestconfig: Any) -> Dict:
+def browser_type_launch_args(pytestconfig: Config) -> Dict:
     launch_options = {}
     headed_option = pytestconfig.getoption("--headed")
     if headed_option:
@@ -154,14 +158,14 @@ def _handle_page_goto(
     url = args.pop()
     if not (url.startswith("http://") or url.startswith("https://")):
         url = base_url + url
-    return page._goto(url, *args, **kwargs)  # type: ignore
+    return page._goto(url, *args, **kwargs)
 
 
 @pytest.fixture
 def page(context: BrowserContext, base_url: str) -> Generator[Page, None, None]:
     page = context.new_page()
-    page._goto = page.goto  # type: ignore
-    page.goto = lambda *args, **kwargs: _handle_page_goto(  # type: ignore
+    page._goto = page.goto
+    page.goto = lambda *args, **kwargs: _handle_page_goto(
         page, list(args), kwargs, base_url
     )
     yield page
@@ -184,7 +188,7 @@ def is_chromium(browser_name: str) -> bool:
 
 
 @pytest.fixture(scope="session")
-def browser_name(pytestconfig: Any) -> Optional[str]:
+def browser_name(pytestconfig: Config) -> Optional[str]:
     # When using unittest.TestCase it won't use pytest_generate_tests
     # For that we still try to give the user a slightly less feature-rich experience
     browser_names = pytestconfig.getoption("--browser")
@@ -199,11 +203,11 @@ def browser_name(pytestconfig: Any) -> Optional[str]:
 
 
 @pytest.fixture(scope="session")
-def browser_channel(pytestconfig: Any) -> Optional[str]:
+def browser_channel(pytestconfig: Config) -> Optional[str]:
     return pytestconfig.getoption("--browser-channel")
 
 
-def pytest_addoption(parser: Any) -> None:
+def pytest_addoption(parser: Parser) -> None:
     group = parser.getgroup("playwright", "Playwright")
     group.addoption(
         "--browser",
