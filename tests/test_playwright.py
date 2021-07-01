@@ -316,7 +316,7 @@ def test_django(testdir: pytest.Testdir) -> None:
     result.assert_outcomes(passed=1)
 
 
-def test_device_emulation(testdir: pytest.Testdir) -> None:
+def test_browser_context_args_device(testdir: pytest.Testdir) -> None:
     testdir.makeconftest(
         """
         import pytest
@@ -366,4 +366,17 @@ def test_launch_persistent_context(testdir: pytest.Testdir) -> None:
     """
     )
     result = testdir.runpytest()
+    result.assert_outcomes(passed=1)
+
+
+def test_device_emulation(testdir: pytest.Testdir) -> None:
+    testdir.makepyfile(
+        """
+        import pytest
+        def test_device_emulation(page, device):
+            assert device == 'iPhone 11 Pro'
+            assert "iPhone" in page.evaluate("window.navigator.userAgent")
+    """
+    )
+    result = testdir.runpytest("--device", "iPhone 11 Pro")
     result.assert_outcomes(passed=1)

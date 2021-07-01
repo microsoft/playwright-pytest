@@ -21,10 +21,10 @@ import pytest
 from playwright.sync_api import (
     Browser,
     BrowserContext,
+    BrowserType,
     Page,
     Playwright,
     sync_playwright,
-    BrowserType,
 )
 
 
@@ -102,8 +102,11 @@ def browser_type_launch_args(pytestconfig: Any) -> Dict:
 
 
 @pytest.fixture(scope="session")
-def browser_context_args() -> Dict:
-    return {}
+def browser_context_args(playwright: Playwright, device: Optional[str]) -> Dict:
+    context_args = {}
+    if device:
+        context_args.update(playwright.devices[device])
+    return context_args
 
 
 @pytest.fixture(scope="session")
@@ -203,6 +206,11 @@ def browser_channel(pytestconfig: Any) -> Optional[str]:
     return pytestconfig.getoption("--browser-channel")
 
 
+@pytest.fixture(scope="session")
+def device(pytestconfig: Any) -> Optional[str]:
+    return pytestconfig.getoption("--device")
+
+
 def pytest_addoption(parser: Any) -> None:
     group = parser.getgroup("playwright", "Playwright")
     group.addoption(
@@ -228,4 +236,7 @@ def pytest_addoption(parser: Any) -> None:
         default=0,
         type=int,
         help="Run tests in slow mo",
+    )
+    group.addoption(
+        "--device", default=None, action="store", help="Device to be emulated."
     )
