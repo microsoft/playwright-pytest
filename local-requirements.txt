@@ -8,3 +8,4 @@ wheel==0.36.2
 flake8==3.9.2
 pre-commit==2.13.0
 Django==3.2.4
+python-slugify==5.0.2

@@ -15,6 +15,7 @@
 import asyncio
 import warnings
 from asyncio import AbstractEventLoop
+from pathlib import Path
 from typing import Any, Callable, Dict, Generator, List, Optional
 
 import pytest
@@ -26,6 +27,7 @@ from playwright.sync_api import (
     Playwright,
     sync_playwright,
 )
+from slugify import slugify
 
 
 def pytest_generate_tests(metafunc: Any) -> None:
@@ -161,7 +163,7 @@ def _handle_page_goto(
 
 
 @pytest.fixture
-def page(context: BrowserContext, base_url: str) -> Generator[Page, None, None]:
+def page(context: BrowserContext, base_url: str, trace_dir: None) -> Generator[Page, None, None]:
     page = context.new_page()
     page._goto = page.goto  # type: ignore
     page.goto = lambda *args, **kwargs: _handle_page_goto(  # type: ignore
@@ -169,6 +171,18 @@ def page(context: BrowserContext, base_url: str) -> Generator[Page, None, None]:
     )
     yield page
     page.close()
+
+
+@pytest.fixture
+def trace_dir(context: BrowserContext, pytestconfig: Any, request: Any) -> None:
+    trace_dir = pytestconfig.getoption("--trace-dir")
+    if trace_dir is not None:
+        context.tracing.start(screenshots=True, snapshots=True)
+    yield
+    if trace_dir is not None:
+        trace_dir = Path(trace_dir)
+        trace_dir.mkdir(exist_ok=True)
+        context.tracing.stop(path=str(trace_dir / f"{slugify(request.node.nodeid)}.zip"))
 
 
 @pytest.fixture(scope="session")
@@ -239,4 +253,7 @@ def pytest_addoption(parser: Any) -> None:
     )
     group.addoption(
         "--device", default=None, action="store", help="Device to be emulated."
+    )
+    group.addoption(
+        "--trace-dir", default=None, help="Directory to store trace recordings"
     )

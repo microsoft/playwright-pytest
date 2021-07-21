@@ -12,7 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from pathlib import Path
 import sys
+from typing import Any
 
 import pytest
 
@@ -380,3 +382,18 @@ def test_device_emulation(testdir: pytest.Testdir) -> None:
     )
     result = testdir.runpytest("--device", "iPhone 11 Pro")
     result.assert_outcomes(passed=1)
+
+
+def test_trace_dir(testdir: pytest.Testdir, tmpdir: Any) -> None:
+    pyfile = testdir.makepyfile(
+        """
+        def test_base_url(page):
+            pass
+    """
+    )
+    result = testdir.runpytest("--trace-dir", str(tmpdir))
+    result.assert_outcomes(passed=1)
+    # trace-dir option slugifes the test name to create a unique file path.
+    slugified_recording = (f"{testdir.tmpdir.basename}-{pyfile.purebasename}"
+                           "-py-test-base-url-chromium.zip").replace('_', '-')
+    assert Path(tmpdir / slugified_recording).is_file()
