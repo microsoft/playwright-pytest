@@ -14,7 +14,7 @@ setuptools.setup(
     packages=["pytest_playwright"],
     include_package_data=True,
     install_requires=[
-        "playwright @ git+https://github.com/mxschmitt/playwright-python@roll/1.13.0-next-1625813701000",
+        "playwright>=1.13",
         "pytest",
         "pytest-base-url",
     ],
