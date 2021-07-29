@@ -102,10 +102,15 @@ def browser_type_launch_args(pytestconfig: Any) -> Dict:
 
 
 @pytest.fixture(scope="session")
-def browser_context_args(playwright: Playwright, device: Optional[str]) -> Dict:
+def browser_context_args(
+    pytestconfig: Any, playwright: Playwright, device: Optional[str]
+) -> Dict:
     context_args = {}
     if device:
         context_args.update(playwright.devices[device])
+    base_url = pytestconfig.getoption("--base-url")
+    if base_url:
+        context_args["base_url"] = base_url
     return context_args
 
 
@@ -151,22 +156,9 @@ def context(
     context.close()
 
 
-def _handle_page_goto(
-    page: Page, args: List[Any], kwargs: Dict[str, Any], base_url: str
-) -> None:
-    url = args.pop()
-    if not (url.startswith("http://") or url.startswith("https://")):
-        url = base_url + url
-    return page._goto(url, *args, **kwargs)  # type: ignore
-
-
 @pytest.fixture
 def page(context: BrowserContext, base_url: str) -> Generator[Page, None, None]:
     page = context.new_page()
-    page._goto = page.goto  # type: ignore
-    page.goto = lambda *args, **kwargs: _handle_page_goto(  # type: ignore
-        page, list(args), kwargs, base_url
-    )
     yield page
     page.close()
 

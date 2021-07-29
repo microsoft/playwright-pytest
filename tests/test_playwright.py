@@ -47,7 +47,7 @@ def test_slowmo(testdir: pytest.Testdir) -> None:
             assert end_time - start_time >= len(email)
     """
     )
-    result = testdir.runpytest("--browser", "chromium", "--slowmo", "1000", "--headed")
+    result = testdir.runpytest("--browser", "chromium", "--slowmo", "1000")
     result.assert_outcomes(passed=1)
 
 
@@ -85,7 +85,7 @@ def test_invalid_browser_channel(testdir: pytest.Testdir) -> None:
     )
     result = testdir.runpytest("--browser-channel", "not-exists")
     result.assert_outcomes(errors=1)
-    assert "is not supported" in "\n".join(result.outlines)
+    assert "Unsupported chromium channel" in "\n".join(result.outlines)
 
 
 def test_unittest_class(testdir: pytest.Testdir) -> None:
