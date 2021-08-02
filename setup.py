@@ -17,6 +17,7 @@ setuptools.setup(
         "playwright>=1.13",
         "pytest",
         "pytest-base-url",
+        "python-slugify",
     ],
     entry_points={"pytest11": ["playwright = pytest_playwright.pytest_playwright"]},
     classifiers=[
