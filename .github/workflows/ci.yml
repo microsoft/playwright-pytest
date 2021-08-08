@@ -15,7 +15,6 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
     - uses: actions/checkout@v2
-    - uses: microsoft/playwright-github-action@v1
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v2
       with:
@@ -26,6 +25,7 @@ jobs:
         pip install -r local-requirements.txt
         pip install -e .
         python -m playwright install
+        python -m playwright install-deps
     - name: Lint
       uses: pre-commit/action@v2.0.0
     - name: Test
