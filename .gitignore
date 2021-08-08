@@ -141,3 +141,4 @@ dmypy.json
 
 _repo_version.py
 .DS_Store
+/test-results/

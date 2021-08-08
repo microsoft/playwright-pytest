@@ -13,6 +13,8 @@
 # limitations under the License.
 
 import asyncio
+import shutil
+import os
 import warnings
 from asyncio import AbstractEventLoop
 from typing import Any, Callable, Dict, Generator, List, Optional
@@ -22,10 +24,23 @@ from playwright.sync_api import (
     Browser,
     BrowserContext,
     BrowserType,
+    Error,
     Page,
     Playwright,
     sync_playwright,
 )
+from slugify import slugify
+import tempfile
+
+
+artifacts_folder = tempfile.TemporaryDirectory(prefix="playwight-pytest-")
+
+
+@pytest.fixture(scope="session", autouse=True)
+def delete_output_dir(pytestconfig: Any) -> None:
+    output_dir = pytestconfig.getoption("--output")
+    if os.path.exists(output_dir):
+        shutil.rmtree(output_dir)
 
 
 def pytest_generate_tests(metafunc: Any) -> None:
@@ -46,6 +61,20 @@ def pytest_configure(config: Any) -> None:
     config.addinivalue_line(
         "markers", "only_browser(name): mark test to run only on a specific browser"
     )
+
+
+# Making test result information available in fixtures
+# https://docs.pytest.org/en/latest/example/simple.html#making-test-result-information-available-in-fixtures
+@pytest.hookimpl(tryfirst=True, hookwrapper=True)
+def pytest_runtest_makereport(item: Any) -> Generator[None, Any, None]:
+    # execute all other hooks to obtain the report object
+    outcome = yield
+    rep = outcome.get_result()
+
+    # set a report attribute for each phase of a call, which can
+    # be "setup", "call", "teardown"
+
+    setattr(item, "rep_" + rep.when, rep)
 
 
 def _get_skiplist(item: Any, values: List[str], value_name: str) -> List[str]:
@@ -101,9 +130,18 @@ def browser_type_launch_args(pytestconfig: Any) -> Dict:
     return launch_options
 
 
-@pytest.fixture(scope="session")
+def _build_artifact_test_folder(
+    pytestconfig: Any, request: pytest.FixtureRequest, folder_or_file_name: str
+) -> str:
+    output_dir = pytestconfig.getoption("--output")
+    return os.path.join(output_dir, slugify(request.node.nodeid), folder_or_file_name)
+
+
+@pytest.fixture()
 def browser_context_args(
-    pytestconfig: Any, playwright: Playwright, device: Optional[str]
+    pytestconfig: Any,
+    playwright: Playwright,
+    device: Optional[str],
 ) -> Dict:
     context_args = {}
     if device:
@@ -111,6 +149,12 @@ def browser_context_args(
     base_url = pytestconfig.getoption("--base-url")
     if base_url:
         context_args["base_url"] = base_url
+
+    video_option = pytestconfig.getoption("--video")
+    capture_video = video_option in ["on", "retain-on-failure"]
+    if capture_video:
+        context_args["record_video_dir"] = artifacts_folder
+
     return context_args
 
 
@@ -145,22 +189,84 @@ def browser(launch_browser: Callable[[], Browser]) -> Generator[Browser, None, N
     browser = launch_browser()
     yield browser
     browser.close()
+    artifacts_folder.cleanup()
 
 
 @pytest.fixture
 def context(
-    browser: Browser, browser_context_args: Dict
+    browser: Browser,
+    browser_context_args: Dict,
+    pytestconfig: Any,
+    request: pytest.FixtureRequest,
 ) -> Generator[BrowserContext, None, None]:
+    pages: List[Page] = []
     context = browser.new_context(**browser_context_args)
+    context.on("page", lambda page: pages.append(page))
+
+    tracing_option = pytestconfig.getoption("--tracing")
+    capture_trace = tracing_option in ["on", "retain-on-failure"]
+    if capture_trace:
+        context.tracing.start(
+            name=slugify(request.node.nodeid),
+            screenshots=True,
+            snapshots=True,
+        )
+
     yield context
+
+    if capture_trace:
+        retain_trace = tracing_option == "on" or (
+            request.node.rep_call.failed and tracing_option == "retain-on-failure"
+        )
+        if retain_trace:
+            trace_path = _build_artifact_test_folder(pytestconfig, request, "trace.zip")
+            context.tracing.stop(path=trace_path)
+        else:
+            context.tracing.stop()
+
+    screenshot_option = pytestconfig.getoption("--screenshot")
+    capture_screenshot = screenshot_option == "on" or (
+        request.node.rep_call.failed and screenshot_option == "only-on-failure"
+    )
+    if capture_screenshot:
+        for index, page in enumerate(pages):
+            human_readable_status = (
+                "failed" if request.node.rep_call.failed else "finished"
+            )
+            screenshot_path = _build_artifact_test_folder(
+                pytestconfig, request, f"test-{human_readable_status}-{index+1}.png"
+            )
+            try:
+                page.screenshot(timeout=5000, path=screenshot_path)
+            except Error:
+                pass
+
     context.close()
+
+    video_option = pytestconfig.getoption("--video")
+    preserve_video = video_option == "on" or (
+        video_option == "retain-on-failure" and request.node.rep_call.failed
+    )
+    if preserve_video:
+        for page in pages:
+            video = page.video
+            if not video:
+                continue
+            try:
+                video_path = video.path()
+                file_name = os.path.basename(video_path)
+                video.save_as(
+                    path=_build_artifact_test_folder(pytestconfig, request, file_name)
+                )
+            except Error:
+                # Silent catch empty videos.
+                pass
 
 
 @pytest.fixture
 def page(context: BrowserContext, base_url: str) -> Generator[Page, None, None]:
     page = context.new_page()
     yield page
-    page.close()
 
 
 @pytest.fixture(scope="session")
@@ -231,4 +337,27 @@ def pytest_addoption(parser: Any) -> None:
     )
     group.addoption(
         "--device", default=None, action="store", help="Device to be emulated."
+    )
+    group.addoption(
+        "--output",
+        default="test-results",
+        help="Directory for artifacts produced by tests, defaults to test-results.",
+    )
+    group.addoption(
+        "--tracing",
+        default="off",
+        choices=["on", "off", "retain-on-failure"],
+        help="Whether to record a trace for each test.",
+    )
+    group.addoption(
+        "--video",
+        default="off",
+        choices=["on", "off", "retain-on-failure"],
+        help="Whether to record video for each test.",
+    )
+    group.addoption(
+        "--screenshot",
+        default="off",
+        choices=["on", "off", "only-on-failure"],
+        help="Whether to automatically capture a screenshot after each test.",
     )

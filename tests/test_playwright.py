@@ -12,7 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
+import re
 import sys
+from typing import Any, List
 
 import pytest
 
@@ -151,7 +154,7 @@ def test_browser_context_args(testdir: pytest.Testdir) -> None:
         """
         import pytest
 
-        @pytest.fixture(scope="session")
+        @pytest.fixture()
         def browser_context_args():
             return {"user_agent": "foobar"}
     """
@@ -321,7 +324,7 @@ def test_browser_context_args_device(testdir: pytest.Testdir) -> None:
         """
         import pytest
 
-        @pytest.fixture(scope="session")
+        @pytest.fixture()
         def browser_context_args(browser_context_args, playwright):
             iphone_11 = playwright.devices['iPhone 11 Pro']
             return {**browser_context_args, **iphone_11}
@@ -344,7 +347,7 @@ def test_launch_persistent_context(testdir: pytest.Testdir) -> None:
         from playwright.sync_api import BrowserType
         from typing import Dict
 
-        @pytest.fixture(scope="session")
+        @pytest.fixture()
         def context(
             browser_type: BrowserType,
             browser_type_launch_args: Dict,
@@ -380,3 +383,141 @@ def test_device_emulation(testdir: pytest.Testdir) -> None:
     )
     result = testdir.runpytest("--device", "iPhone 11 Pro")
     result.assert_outcomes(passed=1)
+
+
+def test_artifacts_by_default_it_should_not_store_anything(
+    testdir: pytest.Testdir,
+) -> None:
+    testdir.makepyfile(
+        """
+        def test_passing(page):
+            assert 2 == page.evaluate("1 + 1")
+
+        def test_failing(page):
+            raise Exception("Failed")
+    """
+    )
+    result = testdir.runpytest()
+    result.assert_outcomes(passed=1, failed=1)
+    for dir in testdir.tmpdir.listdir():
+        assert dir.basename != "test-results"
+
+
+def test_artifacts_new_folder_on_run(
+    testdir: pytest.Testdir,
+) -> None:
+    test_results_dir = os.path.join(testdir.tmpdir, "test-results")
+    os.mkdir(os.path.join(test_results_dir))
+    with open(os.path.join(test_results_dir, "example.json"), "w") as f:
+        f.write("foo")
+
+    testdir.makepyfile(
+        """
+        def test_passing(page):
+            assert 2 == page.evaluate("1 + 1")
+    """
+    )
+    result = testdir.runpytest()
+    result.assert_outcomes(passed=1)
+    for dir in testdir.tmpdir.listdir():
+        assert dir.basename != "test-results"
+
+
+def test_artifacts_should_store_everything_if_on(testdir: pytest.Testdir) -> None:
+    testdir.makepyfile(
+        """
+        def test_passing(page):
+            assert 2 == page.evaluate("1 + 1")
+
+        def test_failing(page):
+            raise Exception("Failed")
+    """
+    )
+    result = testdir.runpytest("--screenshot", "on", "--video", "on", "--tracing", "on")
+    result.assert_outcomes(passed=1, failed=1)
+    test_results_dir = os.path.join(testdir.tmpdir, "test-results")
+    expected = [
+        {
+            "name": "test-artifacts-should-store-everything-if-on-py-test-failing-chromium",
+            "children": [
+                {
+                    "name": re.compile(r".*webm"),
+                },
+                {
+                    "name": "test-failed-1.png",
+                },
+                {
+                    "name": "trace.zip",
+                },
+            ],
+        },
+        {
+            "name": "test-artifacts-should-store-everything-if-on-py-test-passing-chromium",
+            "children": [
+                {
+                    "name": re.compile(r".*webm"),
+                },
+                {
+                    "name": "test-finished-1.png",
+                },
+                {
+                    "name": "trace.zip",
+                },
+            ],
+        },
+    ]
+    _assert_folder_tree(test_results_dir, expected)
+
+
+def test_artifacts_retain_on_failure(testdir: pytest.Testdir) -> None:
+    testdir.makepyfile(
+        """
+        def test_passing(page):
+            assert 2 == page.evaluate("1 + 1")
+
+        def test_failing(page):
+            raise Exception("Failed")
+    """
+    )
+    result = testdir.runpytest(
+        "--screenshot",
+        "only-on-failure",
+        "--video",
+        "retain-on-failure",
+        "--tracing",
+        "retain-on-failure",
+    )
+    result.assert_outcomes(passed=1, failed=1)
+    test_results_dir = os.path.join(testdir.tmpdir, "test-results")
+    expected = [
+        {
+            "name": "test-artifacts-retain-on-failure-py-test-failing-chromium",
+            "children": [
+                {
+                    "name": re.compile(r".*webm"),
+                },
+                {
+                    "name": "test-failed-1.png",
+                },
+                {
+                    "name": "trace.zip",
+                },
+            ],
+        }
+    ]
+    _assert_folder_tree(test_results_dir, expected)
+
+
+def _assert_folder_tree(root: str, expected_tree: List[Any]) -> None:
+    assert len(os.listdir(root)) == len(expected_tree)
+    for file in expected_tree:
+        if isinstance(file["name"], str):
+            if "children" in file:
+                assert os.path.isdir(os.path.join(root, file["name"]))
+            else:
+                assert os.path.isfile(os.path.join(root, file["name"]))
+        if isinstance(file["name"], re.Pattern):
+            assert any([file["name"].match(item) for item in os.listdir(root)])
+            assert "children" not in file
+        if "children" in file:
+            _assert_folder_tree(os.path.join(root, file["name"]), file["children"])
