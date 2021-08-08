@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import asyncio
+import shutil
 import os
 import warnings
 from asyncio import AbstractEventLoop
@@ -33,6 +34,13 @@ import tempfile
 
 
 artifacts_folder = tempfile.TemporaryDirectory(prefix="playwight-pytest-")
+
+
+@pytest.fixture(scope="session", autouse=True)
+def delete_output_dir(pytestconfig: Any) -> None:
+    output_dir = pytestconfig.getoption("--output")
+    if os.path.exists(output_dir):
+        shutil.rmtree(output_dir)
 
 
 def pytest_generate_tests(metafunc: Any) -> None:
@@ -236,13 +244,8 @@ def context(
     context.close()
 
     video_option = pytestconfig.getoption("--video")
-    capture_video = video_option == "on" or (
-        request.node.rep_call.failed and video_option == "only-on-failure"
-    )
-    preserve_video = (
-        capture_video
-        and video_option == "on"
-        or (request.node.rep_call.failed and video_option == "retain-on-failure")
+    preserve_video = video_option == "on" or (
+        video_option == "retain-on-failure" and request.node.rep_call.failed
     )
     if preserve_video:
         for page in pages:

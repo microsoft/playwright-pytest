@@ -403,6 +403,26 @@ def test_artifacts_by_default_it_should_not_store_anything(
         assert dir.basename != "test-results"
 
 
+def test_artifacts_new_folder_on_run(
+    testdir: pytest.Testdir,
+) -> None:
+    test_results_dir = os.path.join(testdir.tmpdir, "test-results")
+    os.mkdir(os.path.join(test_results_dir))
+    with open(os.path.join(test_results_dir, "example.json"), "w") as f:
+        f.write("foo")
+
+    testdir.makepyfile(
+        """
+        def test_passing(page):
+            assert 2 == page.evaluate("1 + 1")
+    """
+    )
+    result = testdir.runpytest()
+    result.assert_outcomes(passed=1)
+    for dir in testdir.tmpdir.listdir():
+        assert dir.basename != "test-results"
+
+
 def test_artifacts_should_store_everything_if_on(testdir: pytest.Testdir) -> None:
     testdir.makepyfile(
         """
