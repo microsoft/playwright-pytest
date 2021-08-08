@@ -301,8 +301,7 @@ def test_invalid_browser_name(testdir: pytest.Testdir) -> None:
     """
     )
     result = testdir.runpytest("--browser", "test123")
-    result.assert_outcomes(errors=1)
-    assert "'test123' is not allowed" in "\n".join(result.outlines)
+    assert any(["--browser: invalid choice" in line for line in result.errlines])
 
 
 def test_django(testdir: pytest.Testdir) -> None:

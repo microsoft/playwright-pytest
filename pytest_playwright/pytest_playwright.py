@@ -46,11 +46,6 @@ def delete_output_dir(pytestconfig: Any) -> None:
 def pytest_generate_tests(metafunc: Any) -> None:
     if "browser_name" in metafunc.fixturenames:
         browsers = metafunc.config.option.browser or ["chromium"]
-        for browser in browsers:
-            if browser not in ["chromium", "firefox", "webkit"]:
-                raise ValueError(
-                    f"'{browser}' is not allowed. Only chromium, firefox, or webkit are valid browser names."
-                )
         metafunc.parametrize("browser_name", browsers, scope="session")
 
 
@@ -172,7 +167,6 @@ def browser_type(playwright: Playwright, browser_name: str) -> BrowserType:
 
 @pytest.fixture(scope="session")
 def launch_browser(
-    playwright: Playwright,
     browser_type_launch_args: Dict,
     browser_type: BrowserType,
 ) -> Callable[..., Browser]:
@@ -316,6 +310,7 @@ def pytest_addoption(parser: Any) -> None:
         action="append",
         default=[],
         help="Browser engine which should be used",
+        choices=["chromium", "firefox", "webkit"],
     )
     group.addoption(
         "--headed",
@@ -333,7 +328,7 @@ def pytest_addoption(parser: Any) -> None:
         "--slowmo",
         default=0,
         type=int,
-        help="Run tests in slow mo",
+        help="Run tests with slow mo",
     )
     group.addoption(
         "--device", default=None, action="store", help="Device to be emulated."
