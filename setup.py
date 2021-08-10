@@ -18,6 +18,8 @@ setuptools.setup(
         "pytest",
         "pytest-base-url",
         "python-slugify",
+        "pixelmatch",
+        "Pillow",
     ],
     entry_points={"pytest11": ["playwright = pytest_playwright.pytest_playwright"]},
     classifiers=[

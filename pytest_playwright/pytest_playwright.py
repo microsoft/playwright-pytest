@@ -11,15 +11,20 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import asyncio
-import shutil
 import os
+import shutil
+import sys
+import tempfile
 import warnings
 from asyncio import AbstractEventLoop
+from io import BytesIO
+from pathlib import Path
 from typing import Any, Callable, Dict, Generator, List, Optional
 
 import pytest
+from PIL import Image
+from pixelmatch.contrib.PIL import pixelmatch
 from playwright.sync_api import (
     Browser,
     BrowserContext,
@@ -30,8 +35,6 @@ from playwright.sync_api import (
     sync_playwright,
 )
 from slugify import slugify
-import tempfile
-
 
 artifacts_folder = tempfile.TemporaryDirectory(prefix="playwright-pytest-")
 
@@ -303,6 +306,33 @@ def device(pytestconfig: Any) -> Optional[str]:
     return pytestconfig.getoption("--device")
 
 
+@pytest.fixture
+def assert_snapshot(
+    pytestconfig: Any, request: Any, browser_name: str
+) -> Callable[[bytes, str], None]:
+    def compare(img: bytes, name: str, *, threshold: float = 0.1) -> None:
+        update_snapshot = pytestconfig.getoption("--update-snapshots")
+        filepath = (
+            Path(request.node.fspath).parent.resolve()
+            / "__snapshots__"
+            / browser_name
+            / sys.platform
+        )
+        filepath.mkdir(parents=True, exist_ok=True)
+        file = filepath / name
+        if update_snapshot:
+            file.write_bytes(img)
+            return
+        if not file.exists():
+            pytest.fail("Snapshot not found, use --update-snapshots to update it.")
+        image = Image.open(BytesIO(img))
+        golden = Image.open(file)
+        diff_pixels = pixelmatch(image, golden, threshold=threshold)
+        assert diff_pixels == 0, "Snapshot does not match"
+
+    return compare
+
+
 def pytest_addoption(parser: Any) -> None:
     group = parser.getgroup("playwright", "Playwright")
     group.addoption(
@@ -355,4 +385,10 @@ def pytest_addoption(parser: Any) -> None:
         default="off",
         choices=["on", "off", "only-on-failure"],
         help="Whether to automatically capture a screenshot after each test.",
+    )
+    group.addoption(
+        "--update-snapshots",
+        action="store_true",
+        default=False,
+        help="Update snapshots.",
     )

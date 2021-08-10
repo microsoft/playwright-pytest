@@ -8,3 +8,4 @@ wheel==0.37.0
 flake8==3.9.2
 pre-commit==2.15.0
 Django==3.2.8
+requests==2.26.0
