@@ -170,6 +170,12 @@ def launch_browser(
     browser_type_launch_args: Dict,
     browser_type: BrowserType,
 ) -> Callable[..., Browser]:
+    if (
+        browser_type.name != "chromium"
+        and browser_type_launch_args.get("channel") == "chrome"
+    ):
+        del browser_type_launch_args["channel"]
+
     def launch(**kwargs: Dict) -> Browser:
         launch_options = {**browser_type_launch_args, **kwargs}
         browser = browser_type.launch(**launch_options)
