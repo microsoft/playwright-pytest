@@ -33,7 +33,7 @@ from slugify import slugify
 import tempfile
 
 
-artifacts_folder = tempfile.TemporaryDirectory(prefix="playwight-pytest-")
+artifacts_folder = tempfile.TemporaryDirectory(prefix="playwright-pytest-")
 
 
 @pytest.fixture(scope="session", autouse=True)
