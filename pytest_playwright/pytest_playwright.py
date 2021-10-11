@@ -148,7 +148,7 @@ def browser_context_args(
     video_option = pytestconfig.getoption("--video")
     capture_video = video_option in ["on", "retain-on-failure"]
     if capture_video:
-        context_args["record_video_dir"] = artifacts_folder
+        context_args["record_video_dir"] = artifacts_folder.name
 
     return context_args
 
