@@ -154,7 +154,7 @@ def test_browser_context_args(testdir: pytest.Testdir) -> None:
         """
         import pytest
 
-        @pytest.fixture()
+        @pytest.fixture(scope="session")
         def browser_context_args():
             return {"user_agent": "foobar"}
     """
@@ -323,7 +323,7 @@ def test_browser_context_args_device(testdir: pytest.Testdir) -> None:
         """
         import pytest
 
-        @pytest.fixture()
+        @pytest.fixture(scope="session")
         def browser_context_args(browser_context_args, playwright):
             iphone_11 = playwright.devices['iPhone 11 Pro']
             return {**browser_context_args, **iphone_11}
