@@ -132,7 +132,7 @@ def _build_artifact_test_folder(
     return os.path.join(output_dir, slugify(request.node.nodeid), folder_or_file_name)
 
 
-@pytest.fixture()
+@pytest.fixture(scope="session")
 def browser_context_args(
     pytestconfig: Any,
     playwright: Playwright,
