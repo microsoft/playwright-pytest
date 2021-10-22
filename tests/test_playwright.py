@@ -368,7 +368,6 @@ def test_launch_persistent_context_session(testdir: pytest.Testdir) -> None:
     """
     )
     result = testdir.runpytest()
-    breakpoint()
     result.assert_outcomes(passed=1)
 
 
