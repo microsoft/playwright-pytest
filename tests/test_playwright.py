@@ -339,7 +339,39 @@ def test_browser_context_args_device(testdir: pytest.Testdir) -> None:
     result.assert_outcomes(passed=1)
 
 
-def test_launch_persistent_context(testdir: pytest.Testdir) -> None:
+def test_launch_persistent_context_session(testdir: pytest.Testdir) -> None:
+    testdir.makeconftest(
+        """
+        import pytest
+        from playwright.sync_api import BrowserType
+        from typing import Dict
+
+        @pytest.fixture(scope="session")
+        def context(
+            browser_type: BrowserType,
+            browser_type_launch_args: Dict,
+            browser_context_args: Dict
+        ):
+            context = browser_type.launch_persistent_context("./foobar", **{
+                **browser_type_launch_args,
+                **browser_context_args,
+                "locale": "de-DE",
+            })
+            yield context
+            context.close()
+    """
+    )
+    testdir.makepyfile(
+        """
+        def test_browser_context_args(page):
+            assert page.evaluate("navigator.language") == "de-DE"
+    """
+    )
+    result = testdir.runpytest()
+    result.assert_outcomes(passed=1)
+
+
+def test_launch_persistent_context_function(testdir: pytest.Testdir) -> None:
     testdir.makeconftest(
         """
         import pytest
