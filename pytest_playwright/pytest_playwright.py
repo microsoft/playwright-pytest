@@ -261,6 +261,7 @@ def context(
 def page(context: BrowserContext, base_url: str) -> Generator[Page, None, None]:
     page = context.new_page()
     yield page
+    page.close()
 
 
 @pytest.fixture(scope="session")
