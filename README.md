@@ -8,4 +8,4 @@ Write end-to-end tests for your web apps with [Playwright](https://github.com/mi
 
 ## Documentation
 
-See on [playwright.dev](https://playwright.dev/python/docs/test-runners/) for examples and more detailed information.
+See on [playwright.dev](https://playwright.dev/python/docs/test-runners) for examples and more detailed information.
