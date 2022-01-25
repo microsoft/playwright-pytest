@@ -126,7 +126,7 @@ def browser_type_launch_args(pytestconfig: Any) -> Dict:
 
 
 def _build_artifact_test_folder(
-    pytestconfig: Any, request: pytest.FixtureRequest, folder_or_file_name: str
+    pytestconfig: Any, request: pytest.fixture, folder_or_file_name: str
 ) -> str:
     output_dir = pytestconfig.getoption("--output")
     return os.path.join(output_dir, slugify(request.node.nodeid), folder_or_file_name)
@@ -191,7 +191,7 @@ def context(
     browser: Browser,
     browser_context_args: Dict,
     pytestconfig: Any,
-    request: pytest.FixtureRequest,
+    request: pytest.fixture,
 ) -> Generator[BrowserContext, None, None]:
     pages: List[Page] = []
     context = browser.new_context(**browser_context_args)
