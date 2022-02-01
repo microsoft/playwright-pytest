@@ -416,6 +416,21 @@ def test_device_emulation(testdir: pytest.Testdir) -> None:
     result.assert_outcomes(passed=1)
 
 
+@pytest.mark.xfail(reason="https://github.com/microsoft/playwright-pytest/pull/96")
+def test_rep_call_keyboard_interrupt(testdir: pytest.Testdir) -> None:
+    testdir.makepyfile(
+        """
+        import pytest
+
+        def test_rep_call(page):
+            assert page.evaluate("1 + 1") == 2
+            raise KeyboardInterrupt
+    """
+    )
+    result = testdir.runpytest()
+    result.assert_outcomes(passed=0, failed=0, skipped=0)
+
+
 def test_artifacts_by_default_it_should_not_store_anything(
     testdir: pytest.Testdir,
 ) -> None:
