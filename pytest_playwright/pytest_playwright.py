@@ -209,14 +209,15 @@ def context(
     yield context
 
     try:
-        failure = request.node.rep_call.failue
+        failed = request.node.rep_call.failed
     except AttributeError:
         # If requst.node is missing rep_call, then some error happened during execution
         # that prevented teardown, but should still be counted as a failure
-        failure = True
+        failed = True
+
     if capture_trace:
         retain_trace = tracing_option == "on" or (
-            failure and tracing_option == "retain-on-failure"
+            failed and tracing_option == "retain-on-failure"
         )
         if retain_trace:
             trace_path = _build_artifact_test_folder(pytestconfig, request, "trace.zip")
@@ -226,11 +227,11 @@ def context(
 
     screenshot_option = pytestconfig.getoption("--screenshot")
     capture_screenshot = screenshot_option == "on" or (
-        failure and screenshot_option == "only-on-failure"
+        failed and screenshot_option == "only-on-failure"
     )
     if capture_screenshot:
         for index, page in enumerate(pages):
-            human_readable_status = "failed" if failure else "finished"
+            human_readable_status = "failed" if failed else "finished"
             screenshot_path = _build_artifact_test_folder(
                 pytestconfig, request, f"test-{human_readable_status}-{index+1}.png"
             )
@@ -243,7 +244,7 @@ def context(
 
     video_option = pytestconfig.getoption("--video")
     preserve_video = video_option == "on" or (
-        failure and video_option == "retain-on-failure"
+        failed and video_option == "retain-on-failure"
     )
     if preserve_video:
         for page in pages:
