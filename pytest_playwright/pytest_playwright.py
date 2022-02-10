@@ -208,12 +208,9 @@ def context(
 
     yield context
 
-    try:
-        failed = request.node.rep_call.failed
-    except AttributeError:
-        # If requst.node is missing rep_call, then some error happened during execution
-        # that prevented teardown, but should still be counted as a failure
-        failed = True
+    # If requst.node is missing rep_call, then some error happened during execution
+    # that prevented teardown, but should still be counted as a failure
+    failed = request.node.rep_call.failed if hasattr(request.node, "rep_call") else True
 
     if capture_trace:
         retain_trace = tracing_option == "on" or (
