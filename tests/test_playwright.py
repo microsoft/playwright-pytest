@@ -416,7 +416,6 @@ def test_device_emulation(testdir: pytest.Testdir) -> None:
     result.assert_outcomes(passed=1)
 
 
-@pytest.mark.xfail(reason="https://github.com/microsoft/playwright-pytest/pull/96")
 def test_rep_call_keyboard_interrupt(testdir: pytest.Testdir) -> None:
     testdir.makepyfile(
         """
