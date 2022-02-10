@@ -7,4 +7,4 @@ twine==3.7.1
 wheel==0.37.1
 flake8==4.0.1
 pre-commit==2.17.0
-Django==3.2.11
+Django==3.2.12
