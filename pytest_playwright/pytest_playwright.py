@@ -40,7 +40,11 @@ artifacts_folder = tempfile.TemporaryDirectory(prefix="playwright-pytest-")
 def delete_output_dir(pytestconfig: Any) -> None:
     output_dir = pytestconfig.getoption("--output")
     if os.path.exists(output_dir):
-        shutil.rmtree(output_dir)
+        try:
+            shutil.rmtree(output_dir)
+        except FileNotFoundError:
+            # When running in parallel, another thread may have already deleted the files
+            pass
 
 
 def pytest_generate_tests(metafunc: Any) -> None:
