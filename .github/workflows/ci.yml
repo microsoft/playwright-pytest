@@ -27,7 +27,7 @@ jobs:
         python -m playwright install
         python -m playwright install-deps
     - name: Lint
-      uses: pre-commit/action@v2.0.3
+      run: pre-commit run --show-diff-on-failure --color=always --all-files
     - name: Test
       if: ${{ matrix.os != 'ubuntu-latest' }}
       run: pytest --cov=pytest_playwright --cov-report xml
