@@ -371,6 +371,46 @@ def test_launch_persistent_context_session(testdir: pytest.Testdir) -> None:
     result.assert_outcomes(passed=1)
 
 
+def test_context_page_on_session_level(testdir: pytest.Testdir) -> None:
+    testdir.makeconftest(
+        """
+        import pytest
+        from playwright.sync_api import Browser, BrowserContext
+        from typing import Dict
+
+        @pytest.fixture(scope="session")
+        def context(
+            browser: Browser,
+            browser_context_args: Dict
+        ):
+            context = browser.new_context(**{
+                **browser_context_args,
+            })
+            yield context
+            context.close()
+
+        @pytest.fixture(scope="session")
+        def page(
+            context: BrowserContext,
+        ):
+            page = context.new_page()
+            yield page
+    """
+    )
+    testdir.makepyfile(
+        """
+        def test_a(page):
+            page.goto("data:text/html,<div>B</div>")
+            assert page.text_content("div") == "B"
+
+        def test_b(page):
+            assert page.text_content("div") == "B"
+        """
+    )
+    result = testdir.runpytest()
+    result.assert_outcomes(passed=2)
+
+
 def test_launch_persistent_context_function(testdir: pytest.Testdir) -> None:
     testdir.makeconftest(
         """
