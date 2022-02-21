@@ -208,6 +208,7 @@ def context(
             name=slugify(request.node.nodeid),
             screenshots=True,
             snapshots=True,
+            sources=True,
         )
 
     yield context
