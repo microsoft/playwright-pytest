@@ -12,11 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import asyncio
 import shutil
 import os
 import warnings
-from asyncio import AbstractEventLoop
 from typing import Any, Callable, Dict, Generator, List, Optional
 
 import pytest
@@ -105,13 +103,6 @@ def pytest_runtest_setup(item: Any) -> None:
 
     if browser_name in skip_browsers_names:
         pytest.skip("skipped for this browser: {}".format(browser_name))
-
-
-@pytest.fixture(scope="session")
-def event_loop() -> Generator[AbstractEventLoop, None, None]:
-    loop = asyncio.get_event_loop()
-    yield loop
-    loop.close()
 
 
 @pytest.fixture(scope="session")
