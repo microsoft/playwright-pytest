@@ -14,6 +14,7 @@
 
 import shutil
 import os
+import sys
 import warnings
 from typing import Any, Callable, Dict, Generator, List, Optional
 
@@ -105,11 +106,17 @@ def pytest_runtest_setup(item: Any) -> None:
         pytest.skip("skipped for this browser: {}".format(browser_name))
 
 
+VSCODE_PYTHON_EXTENSION_ID = "ms-python.python"
+
+
 @pytest.fixture(scope="session")
 def browser_type_launch_args(pytestconfig: Any) -> Dict:
     launch_options = {}
     headed_option = pytestconfig.getoption("--headed")
     if headed_option:
+        launch_options["headless"] = False
+    elif VSCODE_PYTHON_EXTENSION_ID in sys.argv[0] and _is_debugger_attached():
+        # When the VSCode debugger is attached, then launch the browser headed by default
         launch_options["headless"] = False
     browser_channel_option = pytestconfig.getoption("--browser-channel")
     if browser_channel_option:
@@ -118,6 +125,16 @@ def browser_type_launch_args(pytestconfig: Any) -> Dict:
     if slowmo_option:
         launch_options["slow_mo"] = slowmo_option
     return launch_options
+
+
+def _is_debugger_attached() -> bool:
+    pydevd = sys.modules.get("pydevd")
+    if not pydevd or not hasattr(pydevd, "get_global_debugger"):
+        return False
+    debugger = pydevd.get_global_debugger()
+    if not debugger or not hasattr(debugger, "is_attached"):
+        return False
+    return debugger.is_attached()
 
 
 def _build_artifact_test_folder(
