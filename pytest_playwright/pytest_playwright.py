@@ -40,7 +40,7 @@ artifacts_folder = tempfile.TemporaryDirectory(prefix="playwright-pytest-")
 def delete_output_dir(pytestconfig: Any) -> None:
     output_dir = pytestconfig.getoption("--output")
     output_deletion = pytestconfig.getoption("--output-deletion")
-    if os.path.exists(output_dir) and output_deletion=="on":
+    if os.path.exists(output_dir) and output_deletion == "on":
         try:
             shutil.rmtree(output_dir)
         except FileNotFoundError:
@@ -145,9 +145,9 @@ def _build_artifact_test_folder(
     output_dir = pytestconfig.getoption("--output")
     output_timestamped = pytestconfig.getoption("--output-timestamped")
     result_dir = slugify(request.node.nodeid)
-    if output_timestamped=="on":
+    if output_timestamped == "on":
         result_dir = "-".join([timestamp, slugify(request.node.nodeid)])
-        
+
     return os.path.join(output_dir, result_dir, folder_or_file_name)
 
 
