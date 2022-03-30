@@ -145,7 +145,7 @@ def _build_artifact_test_folder(
     output_dir = pytestconfig.getoption("--output")
     output_timestamped = pytestconfig.getoption("--output-timestamped")
     result_dir = slugify(request.node.nodeid)
-    if output_timestamped == "on":
+    if output_timestamped=="on":
         result_dir = "-".join([timestamp, slugify(request.node.nodeid)])
         
     return os.path.join(output_dir, result_dir, folder_or_file_name)
