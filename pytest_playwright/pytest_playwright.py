@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import shutil
+import datetime
 import os
 import sys
 import warnings
@@ -38,7 +39,9 @@ artifacts_folder = tempfile.TemporaryDirectory(prefix="playwright-pytest-")
 @pytest.fixture(scope="session", autouse=True)
 def delete_output_dir(pytestconfig: Any) -> None:
     output_dir = pytestconfig.getoption("--output")
-    if os.path.exists(output_dir):
+    output_deletion = pytestconfig.getoption("--output-deletion")
+
+    if os.path.exists(output_dir) and output_deletion=="on":
         try:
             shutil.rmtree(output_dir)
         except FileNotFoundError:
@@ -138,10 +141,16 @@ def _is_debugger_attached() -> bool:
 
 
 def _build_artifact_test_folder(
-    pytestconfig: Any, request: pytest.FixtureRequest, folder_or_file_name: str
+    pytestconfig: Any, request: pytest.FixtureRequest, timestamp, folder_or_file_name: str
 ) -> str:
     output_dir = pytestconfig.getoption("--output")
-    return os.path.join(output_dir, slugify(request.node.nodeid), folder_or_file_name)
+    output_timestamped = pytestconfig.getoption("--output-timestamped")
+    
+    result_dir = slugify(request.node.nodeid)
+    if output_timestamped == "on":
+        result_dir = "-".join([timestamp, slugify(request.node.nodeid)])
+        
+    return os.path.join(output_dir, result_dir, folder_or_file_name)
 
 
 @pytest.fixture(scope="session")
@@ -221,6 +230,9 @@ def context(
 
     yield context
 
+    # We define timestamp value for output folder
+    timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+
     # If requst.node is missing rep_call, then some error happened during execution
     # that prevented teardown, but should still be counted as a failure
     failed = request.node.rep_call.failed if hasattr(request.node, "rep_call") else True
@@ -230,7 +242,7 @@ def context(
             failed and tracing_option == "retain-on-failure"
         )
         if retain_trace:
-            trace_path = _build_artifact_test_folder(pytestconfig, request, "trace.zip")
+            trace_path = _build_artifact_test_folder(pytestconfig, request, timestamp, "trace.zip")
             context.tracing.stop(path=trace_path)
         else:
             context.tracing.stop()
@@ -243,7 +255,7 @@ def context(
         for index, page in enumerate(pages):
             human_readable_status = "failed" if failed else "finished"
             screenshot_path = _build_artifact_test_folder(
-                pytestconfig, request, f"test-{human_readable_status}-{index+1}.png"
+                pytestconfig, request, timestamp, f"test-{human_readable_status}-{index+1}.png"
             )
             try:
                 page.screenshot(timeout=5000, path=screenshot_path)
@@ -265,7 +277,7 @@ def context(
                 video_path = video.path()
                 file_name = os.path.basename(video_path)
                 video.save_as(
-                    path=_build_artifact_test_folder(pytestconfig, request, file_name)
+                    path=_build_artifact_test_folder(pytestconfig, request, timestamp, file_name)
                 )
             except Error:
                 # Silent catch empty videos.
@@ -352,6 +364,18 @@ def pytest_addoption(parser: Any) -> None:
         "--output",
         default="test-results",
         help="Directory for artifacts produced by tests, defaults to test-results.",
+    )
+    group.addoption(
+        "--output-deletion",
+        default="on",
+        choices=["on", "off"],
+        help="Delete output folder before running test",
+    )
+    group.addoption(
+        "--output-timestamped",
+        default="off",
+        choices=["on", "off"],
+        help="Add timestamp to output result subfolder name",
     )
     group.addoption(
         "--tracing",
