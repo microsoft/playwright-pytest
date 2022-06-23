@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import locale
 import shutil
 import os
 import sys
@@ -161,6 +162,9 @@ def browser_context_args(
     capture_video = video_option in ["on", "retain-on-failure"]
     if capture_video:
         context_args["record_video_dir"] = artifacts_folder.name
+
+    if 'locale' not in context_args:
+        context_args['locale'] = locale.getlocale()[0]
 
     return context_args
 
