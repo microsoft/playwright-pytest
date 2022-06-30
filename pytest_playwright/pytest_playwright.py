@@ -144,13 +144,19 @@ def _build_artifact_test_folder(
     return os.path.join(output_dir, slugify(request.node.nodeid), folder_or_file_name)
 
 
+@pytest.fixture
+def context_args() -> Dict:
+    """Overwrite this fixture to provide custom arguments to browser.new_context"""
+    return {}
+
+
 @pytest.fixture(scope="session")
 def browser_context_args(
     pytestconfig: Any,
     playwright: Playwright,
     device: Optional[str],
+    context_args: Dict
 ) -> Dict:
-    context_args = {}
     if device:
         context_args.update(playwright.devices[device])
     base_url = pytestconfig.getoption("--base-url")
