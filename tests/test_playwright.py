@@ -281,6 +281,46 @@ def test_parameterization(testdir: pytest.Testdir) -> None:
     assert "test_without_browser PASSED" in "\n".join(result.outlines)
 
 
+def test_xdist(testdir: pytest.Testdir) -> None:
+    testdir.makepyfile(
+        """
+        def test_a(page):
+            page.set_content('<span id="foo">a</span>')
+            page.wait_for_timeout(200)
+            assert page.query_selector("#foo")
+
+        def test_b(page):
+            page.wait_for_timeout(2000)
+            page.set_content('<span id="foo">a</span>')
+            assert page.query_selector("#foo")
+
+        def test_c(page):
+            page.set_content('<span id="foo">a</span>')
+            page.wait_for_timeout(200)
+            assert page.query_selector("#foo")
+
+        def test_d(page):
+            page.set_content('<span id="foo">a</span>')
+            page.wait_for_timeout(200)
+            assert page.query_selector("#foo")
+    """
+    )
+    result = testdir.runpytest(
+        "--verbose",
+        "--browser",
+        "chromium",
+        "--browser",
+        "firefox",
+        "--browser",
+        "webkit",
+        "--numprocesses",
+        "2",
+    )
+    result.assert_outcomes(passed=12)
+    assert "gw0" in "\n".join(result.outlines)
+    assert "gw1" in "\n".join(result.outlines)
+
+
 def test_headed(testdir: pytest.Testdir) -> None:
     testdir.makepyfile(
         """
