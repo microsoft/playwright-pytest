@@ -280,6 +280,7 @@ def test_parameterization(testdir: pytest.Testdir) -> None:
     result.assert_outcomes(passed=4)
     assert "test_without_browser PASSED" in "\n".join(result.outlines)
 
+
 def test_xdist(testdir: pytest.Testdir) -> None:
     testdir.makepyfile(
         """
@@ -318,6 +319,7 @@ def test_xdist(testdir: pytest.Testdir) -> None:
     result.assert_outcomes(passed=12)
     assert "gw0" in "\n".join(result.outlines)
     assert "gw1" in "\n".join(result.outlines)
+
 
 def test_headed(testdir: pytest.Testdir) -> None:
     testdir.makepyfile(
