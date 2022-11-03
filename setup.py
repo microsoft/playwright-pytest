@@ -8,7 +8,7 @@ setuptools.setup(
     author="Microsoft",
     author_email="",
     description="A pytest wrapper with fixtures for Playwright to automate web browsers",
-    license="Apache License 2.0",
+    license="Apache-2.0",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/microsoft/playwright-pytest",
