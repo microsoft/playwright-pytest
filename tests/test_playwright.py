@@ -42,12 +42,13 @@ def test_slowmo(testdir: pytest.Testdir) -> None:
         """
         from time import monotonic
         def test_slowmo(page):
-            start_time = monotonic()
             email = "test@test.com"
             page.set_content("<input type='text'/>")
+            start_time = monotonic()
             page.type("input", email)
             end_time = monotonic()
-            assert end_time - start_time >= len(email)
+            assert end_time - start_time >= 1
+            assert end_time - start_time < 2
     """
     )
     result = testdir.runpytest("--browser", "chromium", "--slowmo", "1000")
