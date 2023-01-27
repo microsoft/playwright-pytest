@@ -170,6 +170,30 @@ def test_browser_context_args(testdir: pytest.Testdir) -> None:
     result.assert_outcomes(passed=1)
 
 
+def test_user_defined_browser_context_args(testdir: pytest.Testdir) -> None:
+    testdir.makeconftest(
+        """
+        import pytest
+
+        @pytest.fixture(scope="session")
+        def browser_context_args():
+            return {"user_agent": "foobar"}
+    """
+    )
+    testdir.makepyfile(
+        """
+        import pytest
+
+        @pytest.mark.browser_context_args(user_agent="overwritten", locale="new-locale")
+        def test_browser_context_args(page):
+            assert page.evaluate("window.navigator.userAgent") == "overwritten"
+            assert page.evaluate("window.navigator.languages") == ["new-locale"]
+    """
+    )
+    result = testdir.runpytest()
+    result.assert_outcomes(passed=1)
+
+
 def test_chromium(testdir: pytest.Testdir) -> None:
     testdir.makepyfile(
         """
