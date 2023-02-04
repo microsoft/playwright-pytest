@@ -251,7 +251,7 @@ def context(
             try:
                 page.screenshot(
                     timeout=5000, path=screenshot_path, full_page=screenshot_fullscreen
-                    )
+                )
             except Error:
                 pass
 
