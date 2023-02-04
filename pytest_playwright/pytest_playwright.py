@@ -376,5 +376,5 @@ def pytest_addoption(parser: Any) -> None:
         "--full-page-screenshot",
         default="off",
         choices=["on", "off"],
-        help="Whether to take a fullscreen screenshot",
+        help="Whether to take a full page screenshot",
     )
