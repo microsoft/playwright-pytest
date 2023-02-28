@@ -44,6 +44,16 @@ def delete_output_dir(pytestconfig: Any) -> None:
         except FileNotFoundError:
             # When running in parallel, another thread may have already deleted the files
             pass
+        except OSError as error:
+            if error.errno != 16:
+                raise
+            # We failed to remove folder, might be due to the whole folder being mounted inside a container:
+            #   https://github.com/microsoft/playwright/issues/12106
+            #   https://github.com/microsoft/playwright-python/issues/1781
+            # Do a best-effort to remove all files inside of it instead.
+            entries = os.listdir(output_dir)
+            for entry in entries:
+                shutil.rmtree(entry)
 
 
 def pytest_generate_tests(metafunc: Any) -> None:
