@@ -159,11 +159,11 @@ def browser_context_args(
     pytestconfig: Any,
     playwright: Playwright,
     device: Optional[str],
+    base_url: Optional[str],
 ) -> Dict:
     context_args = {}
     if device:
         context_args.update(playwright.devices[device])
-    base_url = pytestconfig.getoption("--base-url")
     if base_url:
         context_args["base_url"] = base_url
 

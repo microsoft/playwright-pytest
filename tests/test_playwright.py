@@ -227,6 +227,25 @@ def test_goto(testdir: pytest.Testdir) -> None:
     result.assert_outcomes(passed=1)
 
 
+def test_base_url_via_fixture(testdir: pytest.Testdir) -> None:
+    testdir.makepyfile(
+        """
+        import pytest
+
+        @pytest.fixture(scope="session")
+        def base_url():
+            return "https://example.com"
+
+        def test_base_url(page, base_url):
+            assert base_url == "https://example.com"
+            page.goto("/foobar")
+            assert page.url == "https://example.com/foobar"
+    """
+    )
+    result = testdir.runpytest()
+    result.assert_outcomes(passed=1)
+
+
 def test_skip_browsers(testdir: pytest.Testdir) -> None:
     testdir.makepyfile(
         """
