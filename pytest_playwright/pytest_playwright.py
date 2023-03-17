@@ -223,7 +223,7 @@ def context(
     capture_trace = tracing_option in ["on", "retain-on-failure"]
     if capture_trace:
         context.tracing.start(
-            name=slugify(request.node.nodeid),
+            title=slugify(request.node.nodeid),
             screenshots=True,
             snapshots=True,
             sources=True,
