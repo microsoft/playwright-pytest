@@ -249,7 +249,7 @@ def context(
                 page.screenshot(
                     timeout=5000,
                     path=screenshot_path,
-                    full_page=pytestconfig.getoption("--full-page-screenshot")
+                    full_page=pytestconfig.getoption("--full-page-screenshot"),
                 )
             except Error:
                 pass
