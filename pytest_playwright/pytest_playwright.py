@@ -236,9 +236,6 @@ def context(
             context.tracing.stop()
 
     screenshot_option = pytestconfig.getoption("--screenshot")
-    screenshot_fullscreen = (
-        pytestconfig.getoption("--full-page-screenshot") == "on"
-    )
     capture_screenshot = screenshot_option == "on" or (
         failed and screenshot_option == "only-on-failure"
     )
@@ -250,7 +247,7 @@ def context(
             )
             try:
                 page.screenshot(
-                    timeout=5000, path=screenshot_path, full_page=screenshot_fullscreen
+                    timeout=5000, path=screenshot_path, full_page=pytestconfig.getoption("--full-page-screenshot")
                 )
             except Error:
                 pass
@@ -378,7 +375,7 @@ def pytest_addoption(parser: Any) -> None:
     )
     group.addoption(
         "--full-page-screenshot",
-        default="off",
-        choices=["on", "off"],
+        action="store_true",
+        default=False,
         help="Whether to take a full page screenshot",
     )
