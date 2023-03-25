@@ -237,7 +237,7 @@ def context(
 
     screenshot_option = pytestconfig.getoption("--screenshot")
     screenshot_fullscreen = (
-        True if pytestconfig.getoption("--full-page-screenshot") == "on" else False
+        pytestconfig.getoption("--full-page-screenshot") == "on"
     )
     capture_screenshot = screenshot_option == "on" or (
         failed and screenshot_option == "only-on-failure"
