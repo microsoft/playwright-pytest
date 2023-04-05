@@ -219,8 +219,8 @@ def test_goto(testdir: pytest.Testdir) -> None:
             assert base_url == "https://example.com"
             page.goto("/foobar")
             assert page.url == "https://example.com/foobar"
-            page.goto("http://whatsmyuseragent.org")
-            assert page.url == "http://whatsmyuseragent.org/"
+            page.goto("https://example.org")
+            assert page.url == "https://example.org/"
     """
     )
     result = testdir.runpytest("--base-url", "https://example.com")
