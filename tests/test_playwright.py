@@ -653,6 +653,32 @@ def test_artifacts_retain_on_failure(testdir: pytest.Testdir) -> None:
     _assert_folder_tree(test_results_dir, expected)
 
 
+def test_should_work_with_test_names_which_exceeds_256_characters(
+    testdir: pytest.Testdir,
+) -> None:
+    long_test_name = "abcdefghijklmnopqrstuvwxyz" * 100
+    testdir.makepyfile(
+        f"""
+        def test_{long_test_name}(page):
+            pass
+    """
+    )
+    result = testdir.runpytest("--tracing", "on")
+    result.assert_outcomes(passed=1, failed=0)
+    test_results_dir = os.path.join(testdir.tmpdir, "test-results")
+    expected = [
+        {
+            "name": "test-should-work-with-test-names-which-exceeds-256-characters-py-test-abcdefghijklmnopqrstuvwxyzabcd-23f2441-nopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz-chromium/",
+            "children": [
+                {
+                    "name": "trace.zip",
+                },
+            ],
+        },
+    ]
+    _assert_folder_tree(test_results_dir, expected)
+
+
 def _assert_folder_tree(root: str, expected_tree: List[Any]) -> None:
     assert len(os.listdir(root)) == len(expected_tree)
     for file in expected_tree:

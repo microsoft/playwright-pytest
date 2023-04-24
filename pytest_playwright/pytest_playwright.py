@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import hashlib
 import shutil
 import os
 import sys
@@ -151,7 +152,17 @@ def _build_artifact_test_folder(
     pytestconfig: Any, request: pytest.FixtureRequest, folder_or_file_name: str
 ) -> str:
     output_dir = pytestconfig.getoption("--output")
-    return os.path.join(output_dir, slugify(request.node.nodeid), folder_or_file_name)
+    return os.path.join(
+        output_dir,
+        truncate_file_name(slugify(request.node.nodeid)),
+        truncate_file_name(folder_or_file_name),
+    )
+
+
+def truncate_file_name(file_name: str) -> str:
+    if len(file_name) < 256:
+        return file_name
+    return f"{file_name[:100]}-{hashlib.sha256(file_name.encode()).hexdigest()[:7]}-{file_name[-100:]}"
 
 
 @pytest.fixture(scope="session")
