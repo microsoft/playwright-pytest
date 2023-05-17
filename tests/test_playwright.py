@@ -692,3 +692,25 @@ def _assert_folder_tree(root: str, expected_tree: List[Any]) -> None:
             assert "children" not in file
         if "children" in file:
             _assert_folder_tree(os.path.join(root, file["name"]), file["children"])
+
+
+def test_is_able_to_set_expect_timeout_via_conftest(testdir: pytest.Testdir) -> None:
+    testdir.makeconftest(
+        """
+        from playwright.sync_api import expect
+        expect.set_options(timeout=1111)
+    """
+    )
+    testdir.makepyfile(
+        """
+        from playwright.sync_api import expect
+
+        def test_small_timeout(page):
+            page.goto("data:text/html,")
+            expect(page.locator("#A")).to_be_visible()
+    """
+    )
+    result = testdir.runpytest()
+    result.assert_outcomes(passed=0, failed=1, skipped=0)
+    result.stdout.fnmatch_lines("*AssertionError: Locator expected to be visible*")
+    result.stdout.fnmatch_lines("*LocatorAssertions.to_be_visible with timeout 1111ms*")
