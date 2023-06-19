@@ -70,6 +70,10 @@ def pytest_configure(config: Any) -> None:
     config.addinivalue_line(
         "markers", "only_browser(name): mark test to run only on a specific browser"
     )
+    config.addinivalue_line(
+        "markers",
+        "browser_context_args(**kwargs): provide additional arguments to browser.new_context()",
+    )
 
 
 # Making test result information available in fixtures
@@ -227,6 +231,11 @@ def context(
     request: pytest.FixtureRequest,
 ) -> Generator[BrowserContext, None, None]:
     pages: List[Page] = []
+
+    context_args_marker = next(request.node.iter_markers("browser_context_args"), None)
+    additional_context_args = context_args_marker.kwargs if context_args_marker else {}
+    browser_context_args.update(additional_context_args)
+
     context = browser.new_context(**browser_context_args)
     context.on("page", lambda page: pages.append(page))
 
