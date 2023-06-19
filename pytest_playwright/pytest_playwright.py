@@ -267,7 +267,11 @@ def context(
                 pytestconfig, request, f"test-{human_readable_status}-{index+1}.png"
             )
             try:
-                page.screenshot(timeout=5000, path=screenshot_path)
+                page.screenshot(
+                    timeout=5000,
+                    path=screenshot_path,
+                    full_page=pytestconfig.getoption("--full-page-screenshot"),
+                )
             except Error:
                 pass
 
@@ -391,4 +395,10 @@ def pytest_addoption(parser: Any) -> None:
         default="off",
         choices=["on", "off", "only-on-failure"],
         help="Whether to automatically capture a screenshot after each test.",
+    )
+    group.addoption(
+        "--full-page-screenshot",
+        action="store_true",
+        default=False,
+        help="Whether to take a full page screenshot",
     )
