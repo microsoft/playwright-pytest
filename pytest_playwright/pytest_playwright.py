@@ -251,7 +251,7 @@ def context(
 
     yield context
 
-    # If requst.node is missing rep_call, then some error happened during execution
+    # If request.node is missing rep_call, then some error happened during execution
     # that prevented teardown, but should still be counted as a failure
     failed = request.node.rep_call.failed if hasattr(request.node, "rep_call") else True
 
