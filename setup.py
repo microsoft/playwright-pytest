@@ -23,7 +23,6 @@ setuptools.setup(
     entry_points={"pytest11": ["playwright = pytest_playwright.pytest_playwright"]},
     classifiers=[
         "Programming Language :: Python :: 3",
-        "Programming Language :: Python :: 3.7",
         "Programming Language :: Python :: 3.8",
         "Programming Language :: Python :: 3.9",
         "Programming Language :: Python :: 3.10",
@@ -32,7 +31,7 @@ setuptools.setup(
         "Operating System :: OS Independent",
         "Framework :: Pytest",
     ],
-    python_requires=">=3.7",
+    python_requires=">=3.8",
     use_scm_version={
         "version_scheme": "post-release",
         "write_to": "pytest_playwright/_repo_version.py",
