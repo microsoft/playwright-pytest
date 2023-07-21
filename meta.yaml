@@ -6,17 +6,16 @@ source:
   path: .
 
 build:
-  noarch: python
-  script: {{ PYTHON }} -m pip install . --no-deps -vv
   number: 0
+  script: {{ PYTHON }} -m pip install . --no-deps -vv
 
 requirements:
   host:
-    - python >=3.7
+    - python >=3.8
     - setuptools-scm
     - pip
   run:
-    - python >=3.7
+    - python >=3.8
     - playwright >=1.18
     - pytest >=6.2.4,<8.0.0
     - pytest-base-url >=1.0.0,<3.0.0
@@ -35,8 +34,3 @@ about:
   summary: A pytest wrapper with fixtures for Playwright to automate web browsers
   license: Apache-2.0
   license_file: LICENSE
-
-extra:
-  recipe-maintainers:
-    - mxschmitt
-    - pavelfeldman
