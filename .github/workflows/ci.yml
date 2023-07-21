@@ -46,3 +46,23 @@ jobs:
     - name: Test on Linux
       if: ${{ matrix.os == 'ubuntu-latest' }}
       run: xvfb-run pytest --cov=pytest_playwright --cov-report xml
+  build-conda:
+    name: Conda Build
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ ubuntu-20.04, macos-11, windows-2019 ]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Get conda
+        uses: conda-incubator/setup-miniconda@v2
+        with:
+          python-version: 3.9
+          channels: conda-forge
+      - name: Prepare
+        run: conda install conda-build conda-verify
+      - name: Build
+        run: conda build . -c microsoft -c conda-forge
