@@ -1,0 +1,37 @@
+package:
+  name: "pytest-playwright"
+  version: "{{ environ.get('GIT_DESCRIBE_TAG') | replace('v', '') }}"
+
+source:
+  path: .
+
+build:
+  number: 0
+  noarch: python
+  script: "{{ PYTHON }} -m pip install . --no-deps -vv"
+
+requirements:
+  host:
+    - python >=3.8
+    - setuptools-scm
+    - pip
+  run:
+    - python >=3.8
+    - playwright >=v1.33.0
+    - pytest >=6.2.4,<8.0.0
+    - pytest-base-url >=1.0.0,<3.0.0
+    - python-slugify >=6.0.0,<9.0.0
+
+test:
+  imports:
+    - pytest_playwright
+  commands:
+    - pip check
+  requires:
+    - pip
+
+about:
+  home: https://github.com/microsoft/playwright-pytest
+  summary: A pytest wrapper with fixtures for Playwright to automate web browsers
+  license: Apache-2.0
+  license_file: LICENSE
