@@ -47,4 +47,4 @@ jobs:
           ANACONDA_API_TOKEN: ${{ secrets.ANACONDA_API_TOKEN }}
         run: |
           conda config --set anaconda_upload yes
-          conda build --user microsoft . -c microsoft -c conda-forge
+          conda build --user microsoft . -c microsoft
