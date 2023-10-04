@@ -232,6 +232,7 @@ def context(
 ) -> Generator[BrowserContext, None, None]:
     pages: List[Page] = []
 
+    browser_context_args = browser_context_args.copy()
     context_args_marker = next(request.node.iter_markers("browser_context_args"), None)
     additional_context_args = context_args_marker.kwargs if context_args_marker else {}
     browser_context_args.update(additional_context_args)
