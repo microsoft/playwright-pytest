@@ -20,6 +20,16 @@ from typing import Any, List
 import pytest
 
 
+@pytest.fixture(autouse=True)
+def _set_default_ini_file(testdir: pytest.Testdir) -> None:
+    testdir.makeini(
+        """
+        [pytest]
+        addopts = -p no:asyncio
+    """
+    )
+
+
 def test_default(testdir: pytest.Testdir) -> None:
     testdir.makepyfile(
         """

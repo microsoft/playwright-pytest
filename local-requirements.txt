@@ -9,3 +9,4 @@ flake8==4.0.1
 pre-commit==2.19.0
 Django==3.2.20
 pytest-xdist==2.5.0
+pytest-asyncio==0.21.1

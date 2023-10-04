@@ -1,0 +1,222 @@
+# Copyright (c) Microsoft Corporation.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+import hashlib
+import shutil
+import os
+import sys
+import warnings
+from typing import Any, Dict, Generator, List, Optional, TYPE_CHECKING
+import pytest
+from slugify import slugify
+import tempfile
+
+if TYPE_CHECKING:
+    from playwright.sync_api import (
+        BrowserType,
+        Playwright,
+    )
+
+
+class PytestPlaywright:
+    artifacts_folder = tempfile.TemporaryDirectory(prefix="playwright-pytest-")
+
+    @pytest.fixture(scope="session", autouse=True)
+    def delete_output_dir(self, pytestconfig: Any) -> None:
+        output_dir = pytestconfig.getoption("--output")
+        if os.path.exists(output_dir):
+            try:
+                shutil.rmtree(output_dir)
+            except FileNotFoundError:
+                # When running in parallel, another thread may have already deleted the files
+                pass
+            except OSError as error:
+                if error.errno != 16:
+                    raise
+                # We failed to remove folder, might be due to the whole folder being mounted inside a container:
+                #   https://github.com/microsoft/playwright/issues/12106
+                #   https://github.com/microsoft/playwright-python/issues/1781
+                # Do a best-effort to remove all files inside of it instead.
+                entries = os.listdir(output_dir)
+                for entry in entries:
+                    shutil.rmtree(entry)
+
+    def pytest_generate_tests(self, metafunc: Any) -> None:
+        if "browser_name" in metafunc.fixturenames:
+            browsers = metafunc.config.option.browser or ["chromium"]
+            metafunc.parametrize("browser_name", browsers, scope="session")
+
+    def pytest_configure(self, config: Any) -> None:
+        config.addinivalue_line(
+            "markers", "skip_browser(name): mark test to be skipped a specific browser"
+        )
+        config.addinivalue_line(
+            "markers", "only_browser(name): mark test to run only on a specific browser"
+        )
+        config.addinivalue_line(
+            "markers",
+            "browser_context_args(**kwargs): provide additional arguments to browser.new_context()",
+        )
+
+    # Making test result information available in fixtures
+    # https://docs.pytest.org/en/latest/example/simple.html#making-test-result-information-available-in-fixtures
+    @pytest.hookimpl(tryfirst=True, hookwrapper=True)
+    def pytest_runtest_makereport(self, item: Any) -> Generator[None, Any, None]:
+        # execute all other hooks to obtain the report object
+        outcome = yield
+        rep = outcome.get_result()
+
+        # set a report attribute for each phase of a call, which can
+        # be "setup", "call", "teardown"
+
+        setattr(item, "rep_" + rep.when, rep)
+
+    def pytest_runtest_setup(self, item: Any) -> None:
+        if not hasattr(item, "callspec"):
+            return
+        browser_name = item.callspec.params.get("browser_name")
+        if not browser_name:
+            return
+
+        skip_browsers_names = self._get_skiplist(
+            item, ["chromium", "firefox", "webkit"], "browser"
+        )
+
+        if browser_name in skip_browsers_names:
+            pytest.skip("skipped for this browser: {}".format(browser_name))
+
+    VSCODE_PYTHON_EXTENSION_ID = "ms-python.python"
+
+    @pytest.fixture(scope="session")
+    def browser_type_launch_args(self, pytestconfig: Any) -> Dict:
+        launch_options = {}
+        headed_option = pytestconfig.getoption("--headed")
+        if headed_option:
+            launch_options["headless"] = False
+        elif (
+            self.VSCODE_PYTHON_EXTENSION_ID in sys.argv[0]
+            and self._is_debugger_attached()
+        ):
+            # When the VSCode debugger is attached, then launch the browser headed by default
+            launch_options["headless"] = False
+        browser_channel_option = pytestconfig.getoption("--browser-channel")
+        if browser_channel_option:
+            launch_options["channel"] = browser_channel_option
+        slowmo_option = pytestconfig.getoption("--slowmo")
+        if slowmo_option:
+            launch_options["slow_mo"] = slowmo_option
+        return launch_options
+
+    def _is_debugger_attached(self) -> bool:
+        pydevd = sys.modules.get("pydevd")
+        if not pydevd or not hasattr(pydevd, "get_global_debugger"):
+            return False
+        debugger = pydevd.get_global_debugger()
+        if not debugger or not hasattr(debugger, "is_attached"):
+            return False
+        return debugger.is_attached()
+
+    def _build_artifact_test_folder(
+        self,
+        pytestconfig: Any,
+        request: pytest.FixtureRequest,
+        folder_or_file_name: str,
+    ) -> str:
+        output_dir = pytestconfig.getoption("--output")
+        return os.path.join(
+            output_dir,
+            self.truncate_file_name(slugify(request.node.nodeid)),
+            self.truncate_file_name(folder_or_file_name),
+        )
+
+    def truncate_file_name(self, file_name: str) -> str:
+        if len(file_name) < 256:
+            return file_name
+        return f"{file_name[:100]}-{hashlib.sha256(file_name.encode()).hexdigest()[:7]}-{file_name[-100:]}"
+
+    @pytest.fixture(scope="session")
+    def browser_context_args(
+        self,
+        pytestconfig: Any,
+        playwright: "Playwright",
+        device: Optional[str],
+        base_url: Optional[str],
+    ) -> Dict:
+        context_args = {}
+        if device:
+            context_args.update(playwright.devices[device])
+        if base_url:
+            context_args["base_url"] = base_url
+
+        video_option = pytestconfig.getoption("--video")
+        capture_video = video_option in ["on", "retain-on-failure"]
+        if capture_video:
+            context_args["record_video_dir"] = self.artifacts_folder.name
+
+        return context_args
+
+    @pytest.fixture(scope="session")
+    def browser_type(
+        self, playwright: "Playwright", browser_name: str
+    ) -> "BrowserType":
+        return getattr(playwright, browser_name)
+
+    @pytest.fixture(scope="session")
+    def is_webkit(self, browser_name: str) -> bool:
+        return browser_name == "webkit"
+
+    @pytest.fixture(scope="session")
+    def is_firefox(self, browser_name: str) -> bool:
+        return browser_name == "firefox"
+
+    @pytest.fixture(scope="session")
+    def is_chromium(self, browser_name: str) -> bool:
+        return browser_name == "chromium"
+
+    @pytest.fixture(scope="session")
+    def browser_name(self, pytestconfig: Any) -> Optional[str]:
+        # When using unittest.TestCase it won't use pytest_generate_tests
+        # For that we still try to give the user a slightly less feature-rich experience
+        browser_names = pytestconfig.getoption("--browser")
+        if len(browser_names) == 0:
+            return "chromium"
+        if len(browser_names) == 1:
+            return browser_names[0]
+        warnings.warn(
+            "When using unittest.TestCase specifying multiple browsers is not supported"
+        )
+        return browser_names[0]
+
+    @pytest.fixture(scope="session")
+    def browser_channel(self, pytestconfig: Any) -> Optional[str]:
+        return pytestconfig.getoption("--browser-channel")
+
+    @pytest.fixture(scope="session")
+    def device(self, pytestconfig: Any) -> Optional[str]:
+        return pytestconfig.getoption("--device")
+
+    def _get_skiplist(self, item: Any, values: List[str], value_name: str) -> List[str]:
+        skipped_values: List[str] = []
+        # Allowlist
+        only_marker = item.get_closest_marker(f"only_{value_name}")
+        if only_marker:
+            skipped_values = values
+            skipped_values.remove(only_marker.args[0])
+
+        # Denylist
+        skip_marker = item.get_closest_marker(f"skip_{value_name}")
+        if skip_marker:
+            skipped_values.append(skip_marker.args[0])
+
+        return skipped_values
