@@ -193,6 +193,7 @@ def test_user_defined_browser_context_args(testdir: pytest.Testdir) -> None:
     result = testdir.runpytest()
     result.assert_outcomes(passed=1)
 
+
 def test_user_defined_browser_context_args_clear_again(testdir: pytest.Testdir) -> None:
     testdir.makeconftest(
         """
