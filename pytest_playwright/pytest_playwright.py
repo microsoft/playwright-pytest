@@ -220,7 +220,12 @@ def browser(launch_browser: Callable[[], Browser]) -> Generator[Browser, None, N
     browser = launch_browser()
     yield browser
     browser.close()
-    artifacts_folder.cleanup()
+    try:
+        # On Windows, files can be still in use.
+        # https://github.com/microsoft/playwright-pytest/issues/163
+        artifacts_folder.cleanup()
+    except (PermissionError, NotADirectoryError):
+        pass
 
 
 @pytest.fixture
