@@ -220,7 +220,16 @@ def browser(launch_browser: Callable[[], Browser]) -> Generator[Browser, None, N
     browser = launch_browser()
     yield browser
     browser.close()
-    artifacts_folder.cleanup()
+    try:
+        # .webm files can be still in use, so we do a best-effort in removing the folder
+        # https://github.com/microsoft/playwright-pytest/issues/163
+        artifacts_folder.cleanup()
+    except (PermissionError, NotADirectoryError):
+        for file in os.listdir(artifacts_folder.name):
+            try:
+                os.remove(os.path.join(artifacts_folder.name, file))
+            except Exception:
+                pass
 
 
 @pytest.fixture
