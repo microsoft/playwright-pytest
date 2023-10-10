@@ -221,15 +221,11 @@ def browser(launch_browser: Callable[[], Browser]) -> Generator[Browser, None, N
     yield browser
     browser.close()
     try:
-        # On Windows, files can be still in use, so we do a best-effort in removing the folder
+        # On Windows, files can be still in use.
         # https://github.com/microsoft/playwright-pytest/issues/163
         artifacts_folder.cleanup()
     except (PermissionError, NotADirectoryError):
-        for file in os.listdir(artifacts_folder.name):
-            try:
-                os.remove(os.path.join(artifacts_folder.name, file))
-            except Exception:
-                pass
+        pass
 
 
 @pytest.fixture
