@@ -16,7 +16,7 @@ setuptools.setup(
     include_package_data=True,
     install_requires=[
         "playwright>=1.18",
-        "pytest>=7.0.0,<9.0.0",
+        "pytest>=6.2.4,<9.0.0",
         "pytest-base-url>=1.0.0,<3.0.0",
         "python-slugify>=6.0.0,<9.0.0",
     ],
