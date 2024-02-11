@@ -386,7 +386,10 @@ def pytest_addoption(parser: Any) -> None:
         help="Run tests with slow mo",
     )
     group.addoption(
-        "--device", default=None, action="store", help="Device to be emulated."
+        "--device",
+        default=None,
+        action="store",
+        help="Device to be emulated.",
     )
     group.addoption(
         "--output",
