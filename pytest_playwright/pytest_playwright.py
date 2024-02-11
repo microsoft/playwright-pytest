@@ -18,7 +18,7 @@ import os
 import sys
 import warnings
 from typing import Any, Callable, Dict, Generator, List, Optional
-
+import logging
 import pytest
 from playwright.sync_api import (
     Browser,
@@ -32,6 +32,8 @@ from playwright.sync_api import (
 from slugify import slugify
 import tempfile
 
+
+log = logging.getLogger(__name__)
 
 artifacts_folder = tempfile.TemporaryDirectory(prefix="playwright-pytest-")
 
@@ -74,6 +76,34 @@ def pytest_configure(config: Any) -> None:
         "markers",
         "browser_context_args(**kwargs): provide additional arguments to browser.new_context()",
     )
+    log.debug("pytest_configure")
+    class Teardown:
+        failed = False
+    setattr(config, "teardown", Teardown)
+
+
+def pytest_runtest_teardown(item):
+    # import faulthandler
+    # faulthandler.dump_traceback(all_threads=True)
+    log.debug("pytest_runtest_teardown")
+    item.config.teardown.failed = True
+
+
+def pytest_sessionfinish(session, exitstatus):
+    log.debug("pytest_runtest_teardown")
+    log.debug(f"{exitstatus=}")
+
+
+def pytest_exception_interact(node, call, report):
+    log.debug("1pytest_exception_interact")
+    log.debug(f"{node.config.teardown.failed=}")
+    log.debug(f"{node.session.testsfailed=}")
+    excinfo = call.exc_info if hasattr(call, "exc_info") else None
+    log.debug(f"{excinfo=}")
+
+    if call.when == "teardown":
+        log.debug("2pytest_exception_interact")
+        node.config.teardown.failed = True
 
 
 # Making test result information available in fixtures
@@ -256,10 +286,52 @@ def context(
         )
 
     yield context
+    # import traceback
+    # log.debug(f"{dir(traceback)=}")
+    # log.debug(f"{traceback.print_last()=}")
+    # stack = traceback.extract_stack()
+    # log.debug(f"{stack=}")
+    # for frame_summary in stack:
+    #     log.debug(f"{frame_summary.filename=}")
+    #     log.debug(f"{frame_summary.name=}")
+    #     log.debug(f"{frame_summary.colno=}")
 
+
+    # log.debug(f"{traceback.print_stack()=}")
+
+    # log.debug(f"{traceback.print_exc()=}")
+
+    log.debug(f"{request.session.testscollected=}")
+    log.debug(f"{request.session.exitstatus=}")
+    log.debug(f"{request.session.testsfailed=}")
+
+    if request.session.testsfailed:
+        log.debug("Only print if failed")
+
+    log.debug("context")
     # If request.node is missing rep_call, then some error happened during execution
     # that prevented teardown, but should still be counted as a failure
-    failed = request.node.rep_call.failed if hasattr(request.node, "rep_call") else True
+    failed_setup = request.node.rep_setup.failed if hasattr(request.node, "rep_setup") else False
+    failed_call = request.node.rep_call.failed if hasattr(request.node, "rep_call") else False
+    failed_teardown = request.node.rep_teardown.failed if hasattr(request.node, "rep_teardown") else False
+
+    failed_xteardown = request.config.teardown.failed if hasattr(request.config, "teardown") else False
+
+
+    failed = failed_setup or failed_call or failed_xteardown
+    log.debug(f"{failed=}")
+    log.debug(f"{failed_setup=}")
+    log.debug(f"{failed_call=}")
+    log.debug(f"{failed_teardown=}")
+    log.debug(f"{failed_xteardown=}")
+
+
+    log.debug(f"{hasattr(request.node, 'rep_setup')=}")
+    log.debug(f"{hasattr(request.node, 'rep_call')=}")
+    log.debug(f"{hasattr(request.node, 'rep_teardown')=}")
+
+    log.debug(f"{hasattr(request.config, 'teardown')=}")
+
 
     if capture_trace:
         retain_trace = tracing_option == "on" or (
@@ -272,9 +344,11 @@ def context(
             context.tracing.stop()
 
     screenshot_option = pytestconfig.getoption("--screenshot")
+    log.debug(f"{screenshot_option=}")
     capture_screenshot = screenshot_option == "on" or (
         failed and screenshot_option == "only-on-failure"
     )
+    log.debug(f"{capture_screenshot=}")
     if capture_screenshot:
         for index, page in enumerate(pages):
             human_readable_status = "failed" if failed else "finished"
