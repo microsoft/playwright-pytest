@@ -718,25 +718,34 @@ def test_artifacts_retain_on_setup_failure(testdir: pytest.Testdir) -> None:
     )
     result = testdir.runpytest(
         "--screenshot",
-        "only-on-failure"
+        "only-on-failure",
+        "--video",
+        "retain-on-failure",
+        "--tracing",
+        "retain-on-failure",
     )
     result.assert_outcomes(errors=1)
     test_results_dir = os.path.join(testdir.tmpdir, "test-results")
-
     expected = [
         {
             "name": "test-artifacts-retain-on-setup-failure-py-test-failing-chromium",
             "children": [
                 {
+                    "name": re.compile(r".*webm"),
+                },
+                {
                     "name": "test-failed-1.png",
-                }
+                },
+                {
+                    "name": "trace.zip",
+                },
             ],
         }
     ]
     _assert_folder_tree(test_results_dir, expected)
 
-# request.config.teardown.failed = False
-def test_artifacts_on_teardown(testdir: pytest.Testdir) -> None:
+
+def test_artifacts_retain_on_teardown_failure(testdir: pytest.Testdir) -> None:
     testdir.makepyfile(
         """
         import pytest
@@ -751,23 +760,74 @@ def test_artifacts_on_teardown(testdir: pytest.Testdir) -> None:
     )
     result = testdir.runpytest(
         "--screenshot",
-        "only-on-failure"
+        "only-on-failure",
+        "--video",
+        "retain-on-failure",
+        "--tracing",
+        "retain-on-failure",
     )
-    result.assert_outcomes(passed=1, errors=1)  # сделать чтобы скрин не сохранялся при успешном тесте (и все успешные тирдауны и сетапы)
+    result.assert_outcomes(passed=1, errors=1)
     test_results_dir = os.path.join(testdir.tmpdir, "test-results")
-    print(f"{os.listdir(test_results_dir)=}")
-    print(os.listdir(f"{test_results_dir}/test-artifacts-on-teardown-py-test-passing-chromium"))
     expected = [
         {
-            "name": "test-artifacts-on-teardown-py-test-passing-chromium",
+            "name": "test-artifacts-retain-on-teardown-failure-py-test-passing-chromium",
             "children": [
                 {
+                    "name": re.compile(r".*webm"),
+                },
+                {
                     "name": "test-failed-1.png",
-                }
+                },
+                {
+                    "name": "trace.zip",
+                },
             ],
         }
     ]
     _assert_folder_tree(test_results_dir, expected)
+
+
+def test_empty_artifacts_on_teardown(testdir: pytest.Testdir) -> None:
+    testdir.makepyfile(
+        """
+        import pytest
+        @pytest.fixture
+        def failed_teardown_call(page, request):
+            yield page
+            assert 2 == page.evaluate("1 + 1")
+
+        def test_passing(page, failed_teardown_call):
+            assert 2 == page.evaluate("1 + 1")
+        """
+    )
+    result = testdir.runpytest(
+        "--screenshot",
+        "only-on-failure",
+        "--video",
+        "retain-on-failure",
+        "--tracing",
+        "retain-on-failure",
+    )
+    result.assert_outcomes(passed=1)
+    test_results_dir = os.path.join(testdir.tmpdir, "test-results")
+    expected = [
+        {
+            "name": "test-empty-artifacts-on-teardown-py-test-passing-chromium",
+            "children": [
+                {
+                    "name": re.compile(r".*webm"),
+                },
+                {
+                    "name": "test-failed-1.png",
+                },
+                {
+                    "name": "trace.zip",
+                },
+            ],
+        }
+    ]
+    with pytest.raises(FileNotFoundError):
+        _assert_folder_tree(test_results_dir, expected)
 
 
 def test_should_work_with_test_names_which_exceeds_256_characters(
