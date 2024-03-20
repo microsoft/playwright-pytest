@@ -16,6 +16,9 @@ import hashlib
 import shutil
 import os
 import sys
+
+import traceback
+
 import warnings
 from typing import Any, Callable, Dict, Generator, List, Optional
 
@@ -256,10 +259,33 @@ def context(
         )
 
     yield context
-
     # If request.node is missing rep_call, then some error happened during execution
     # that prevented teardown, but should still be counted as a failure
-    failed = request.node.rep_call.failed if hasattr(request.node, "rep_call") else True
+    failed_setup = (
+        request.node.rep_setup.failed if hasattr(request.node, "rep_setup") else False
+    )
+    failed_call = (
+        request.node.rep_call.failed if hasattr(request.node, "rep_call") else False
+    )
+
+    passed_setup = (
+        request.node.rep_setup.passed if hasattr(request.node, "rep_setup") else False
+    )
+    passed_call = (
+        request.node.rep_call.passed if hasattr(request.node, "rep_call") else False
+    )
+
+    failed_xteardown = False
+
+    if (passed_setup or passed_call) and not (failed_setup or failed_call):
+        # check tb under stack if any other teardown was failed, False by default
+        # looks like workaround for https://github.com/pytest-dev/pytest/issues/9909
+        for trace, _ in traceback.walk_stack(None):
+            if trace.f_locals.get("these_exceptions"):
+                failed_xteardown = True
+                break
+
+    failed = failed_setup or failed_call or failed_xteardown
 
     if capture_trace:
         retain_trace = tracing_option == "on" or (
