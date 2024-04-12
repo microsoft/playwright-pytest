@@ -703,6 +703,133 @@ def test_artifacts_retain_on_failure(testdir: pytest.Testdir) -> None:
     _assert_folder_tree(test_results_dir, expected)
 
 
+def test_artifacts_retain_on_setup_failure(testdir: pytest.Testdir) -> None:
+    testdir.makepyfile(
+        """
+        import pytest
+        @pytest.fixture
+        def failed_setup_call(page):
+            assert 1 == page.evaluate("1 + 1")
+            yield page
+
+        def test_failing(page, failed_setup_call):
+            assert 2 == page.evaluate("1 + 1")
+        """
+    )
+    result = testdir.runpytest(
+        "--screenshot",
+        "only-on-failure",
+        "--video",
+        "retain-on-failure",
+        "--tracing",
+        "retain-on-failure",
+    )
+    result.assert_outcomes(errors=1)
+    test_results_dir = os.path.join(testdir.tmpdir, "test-results")
+    expected = [
+        {
+            "name": "test-artifacts-retain-on-setup-failure-py-test-failing-chromium",
+            "children": [
+                {
+                    "name": re.compile(r".*webm"),
+                },
+                {
+                    "name": "test-failed-1.png",
+                },
+                {
+                    "name": "trace.zip",
+                },
+            ],
+        }
+    ]
+    _assert_folder_tree(test_results_dir, expected)
+
+
+def test_artifacts_retain_on_teardown_failure(testdir: pytest.Testdir) -> None:
+    testdir.makepyfile(
+        """
+        import pytest
+        @pytest.fixture
+        def failed_teardown_call(page, request):
+            yield page
+            assert 1 == page.evaluate("1 + 1")
+
+        def test_passing(page, failed_teardown_call):
+            assert 2 == page.evaluate("1 + 1")
+        """
+    )
+    result = testdir.runpytest(
+        "--screenshot",
+        "only-on-failure",
+        "--video",
+        "retain-on-failure",
+        "--tracing",
+        "retain-on-failure",
+    )
+    result.assert_outcomes(passed=1, errors=1)
+    test_results_dir = os.path.join(testdir.tmpdir, "test-results")
+    expected = [
+        {
+            "name": "test-artifacts-retain-on-teardown-failure-py-test-passing-chromium",
+            "children": [
+                {
+                    "name": re.compile(r".*webm"),
+                },
+                {
+                    "name": "test-failed-1.png",
+                },
+                {
+                    "name": "trace.zip",
+                },
+            ],
+        }
+    ]
+    _assert_folder_tree(test_results_dir, expected)
+
+
+def test_empty_artifacts_on_teardown(testdir: pytest.Testdir) -> None:
+    testdir.makepyfile(
+        """
+        import pytest
+        @pytest.fixture
+        def failed_teardown_call(page, request):
+            yield page
+            assert 2 == page.evaluate("1 + 1")
+
+        def test_passing(page, failed_teardown_call):
+            assert 2 == page.evaluate("1 + 1")
+        """
+    )
+    result = testdir.runpytest(
+        "--screenshot",
+        "only-on-failure",
+        "--video",
+        "retain-on-failure",
+        "--tracing",
+        "retain-on-failure",
+    )
+    result.assert_outcomes(passed=1)
+    test_results_dir = os.path.join(testdir.tmpdir, "test-results")
+    expected = [
+        {
+            "name": "test-empty-artifacts-on-teardown-py-test-passing-chromium",
+            "children": [
+                {
+                    "name": re.compile(r".*webm"),
+                },
+                {
+                    "name": "test-failed-1.png",
+                },
+                {
+                    "name": "trace.zip",
+                },
+            ],
+        }
+    ]
+    with pytest.raises(FileNotFoundError):
+        _assert_folder_tree(test_results_dir, expected)
+
+
 def test_should_work_with_test_names_which_exceeds_256_characters(
     testdir: pytest.Testdir,
 ) -> None:
@@ -734,8 +861,10 @@ def _assert_folder_tree(root: str, expected_tree: List[Any]) -> None:
     for file in expected_tree:
         if isinstance(file["name"], str):
             if "children" in file:
+                print(f"{file=}")
                 assert os.path.isdir(os.path.join(root, file["name"]))
             else:
+                print(f"{file=}")
                 assert os.path.isfile(os.path.join(root, file["name"]))
         if isinstance(file["name"], re.Pattern):
             assert any([file["name"].match(item) for item in os.listdir(root)])
