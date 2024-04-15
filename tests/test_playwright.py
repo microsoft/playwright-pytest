@@ -785,7 +785,6 @@ def test_artifact_collection_should_work_for_manually_created_contexts_get_close
 
         def test_artifact_collection(browser, page, new_context):
             page.goto("data:text/html,<div>hello</div>")
-            page.close()
 
             other_context = new_context()
             other_context_page = other_context.new_page()
@@ -863,3 +862,26 @@ def test_artifact_collection_should_work_for_manually_created_contexts_retain_on
     result.assert_outcomes(passed=1)
     test_results_dir = os.path.join(testdir.tmpdir, "test-results")
     _assert_folder_structure(test_results_dir, "")
+
+
+def test_new_context_allow_passing_args(
+    testdir: pytest.Testdir,
+) -> None:
+    testdir.makepyfile(
+        """
+        import pytest
+
+        def test_artifact_collection(new_context):
+            context1 = new_context(user_agent="agent1")
+            page1 = context1.new_page()
+            assert page1.evaluate("window.navigator.userAgent") == "agent1"
+            context1.close()
+
+            context2 = new_context(user_agent="agent2")
+            page2 = context2.new_page()
+            assert page2.evaluate("window.navigator.userAgent") == "agent2"
+            context2.close()
+            """
+    )
+    result = testdir.runpytest()
+    result.assert_outcomes(passed=1)
