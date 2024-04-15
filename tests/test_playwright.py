@@ -698,6 +698,8 @@ def test_should_work_with_test_names_which_exceeds_256_characters(
 
 
 def _make_folder_list(root: str, level: int = 0) -> str:
+    if not os.path.exists(root):
+        return ""
     tree = []
     for entry in sorted(os.scandir(root), key=lambda e: e.name):
         prefix = f"{'  ' * level}- "
@@ -740,3 +742,124 @@ def test_is_able_to_set_expect_timeout_via_conftest(testdir: pytest.Testdir) -> 
     result.assert_outcomes(passed=0, failed=1, skipped=0)
     result.stdout.fnmatch_lines("*AssertionError: Locator expected to be visible*")
     result.stdout.fnmatch_lines("*LocatorAssertions.to_be_visible with timeout 1111ms*")
+
+
+def test_artifact_collection_should_work_for_manually_created_contexts_keep_open(
+    testdir: pytest.Testdir,
+) -> None:
+    testdir.makepyfile(
+        """
+        import pytest
+
+        def test_artifact_collection(browser, page, new_context):
+            page.goto("data:text/html,<div>hello</div>")
+
+            other_context = new_context()
+            other_context_page = other_context.new_page()
+            other_context_page.goto("data:text/html,<div>hello</div>")
+        """
+    )
+    result = testdir.runpytest("--screenshot", "on", "--video", "on", "--tracing", "on")
+    result.assert_outcomes(passed=1)
+    test_results_dir = os.path.join(testdir.tmpdir, "test-results")
+    _assert_folder_structure(
+        test_results_dir,
+        """
+- test-artifact-collection-should-work-for-manually-created-contexts-keep-open-py-test-artifact-collection-chromium:
+  - test-finished-1.png
+  - test-finished-2.png
+  - trace-1.zip
+  - trace-2.zip
+  - video-1.webm
+  - video-2.webm
+""",
+    )
+
+
+def test_artifact_collection_should_work_for_manually_created_contexts_get_closed(
+    testdir: pytest.Testdir,
+) -> None:
+    testdir.makepyfile(
+        """
+        import pytest
+
+        def test_artifact_collection(browser, page, new_context):
+            page.goto("data:text/html,<div>hello</div>")
+            page.close()
+
+            other_context = new_context()
+            other_context_page = other_context.new_page()
+            other_context_page.goto("data:text/html,<div>hello</div>")
+            other_context.close()
+        """
+    )
+    result = testdir.runpytest("--video", "on", "--tracing", "on")
+    result.assert_outcomes(passed=1)
+    test_results_dir = os.path.join(testdir.tmpdir, "test-results")
+    _assert_folder_structure(
+        test_results_dir,
+        """
+- test-artifact-collection-should-work-for-manually-created-contexts-get-closed-py-test-artifact-collection-chromium:
+  - trace-1.zip
+  - trace-2.zip
+  - video-1.webm
+  - video-2.webm
+""",
+    )
+
+
+def test_artifact_collection_should_work_for_manually_created_contexts_retain_on_failure_failed(
+    testdir: pytest.Testdir,
+) -> None:
+    testdir.makepyfile(
+        """
+        import pytest
+
+        def test_artifact_collection(browser, page, new_context):
+            page.goto("data:text/html,<div>hello</div>")
+
+            other_context = new_context()
+            other_context_page = other_context.new_page()
+            other_context_page.goto("data:text/html,<div>hello</div>")
+
+            raise Exception("Failed")
+        """
+    )
+    result = testdir.runpytest(
+        "--video", "retain-on-failure", "--tracing", "retain-on-failure"
+    )
+    result.assert_outcomes(failed=1)
+    test_results_dir = os.path.join(testdir.tmpdir, "test-results")
+    _assert_folder_structure(
+        test_results_dir,
+        """
+- test-artifact-collection-should-work-for-manually-created-contexts-retain-on-failure-failed-py-test-artifact-collection-chromium:
+  - trace-1.zip
+  - trace-2.zip
+  - video-1.webm
+  - video-2.webm
+""",
+    )
+
+
+def test_artifact_collection_should_work_for_manually_created_contexts_retain_on_failure_pass(
+    testdir: pytest.Testdir,
+) -> None:
+    testdir.makepyfile(
+        """
+        import pytest
+
+        def test_artifact_collection(browser, page, new_context):
+            page.goto("data:text/html,<div>hello</div>")
+
+            other_context = new_context()
+            other_context_page = other_context.new_page()
+            other_context_page.goto("data:text/html,<div>hello</div>")
+        """
+    )
+    result = testdir.runpytest(
+        "--video", "retain-on-failure", "--tracing", "retain-on-failure"
+    )
+    result.assert_outcomes(passed=1)
+    test_results_dir = os.path.join(testdir.tmpdir, "test-results")
+    _assert_folder_structure(test_results_dir, "")
