@@ -13,9 +13,7 @@
 # limitations under the License.
 
 import os
-import re
 import sys
-from typing import Any, List
 
 import pytest
 
@@ -631,37 +629,19 @@ def test_artifacts_should_store_everything_if_on(testdir: pytest.Testdir) -> Non
     result = testdir.runpytest("--screenshot", "on", "--video", "on", "--tracing", "on")
     result.assert_outcomes(passed=1, failed=1)
     test_results_dir = os.path.join(testdir.tmpdir, "test-results")
-    expected = [
-        {
-            "name": "test-artifacts-should-store-everything-if-on-py-test-failing-chromium",
-            "children": [
-                {
-                    "name": re.compile(r".*webm"),
-                },
-                {
-                    "name": "test-failed-1.png",
-                },
-                {
-                    "name": "trace.zip",
-                },
-            ],
-        },
-        {
-            "name": "test-artifacts-should-store-everything-if-on-py-test-passing-chromium",
-            "children": [
-                {
-                    "name": re.compile(r".*webm"),
-                },
-                {
-                    "name": "test-finished-1.png",
-                },
-                {
-                    "name": "trace.zip",
-                },
-            ],
-        },
-    ]
-    _assert_folder_tree(test_results_dir, expected)
+    _assert_folder_structure(
+        test_results_dir,
+        """
+- test-artifacts-should-store-everything-if-on-py-test-failing-chromium:
+  - test-failed-1.png
+  - trace.zip
+  - video.webm
+- test-artifacts-should-store-everything-if-on-py-test-passing-chromium:
+  - test-finished-1.png
+  - trace.zip
+  - video.webm
+""",
+    )
 
 
 def test_artifacts_retain_on_failure(testdir: pytest.Testdir) -> None:
@@ -684,23 +664,15 @@ def test_artifacts_retain_on_failure(testdir: pytest.Testdir) -> None:
     )
     result.assert_outcomes(passed=1, failed=1)
     test_results_dir = os.path.join(testdir.tmpdir, "test-results")
-    expected = [
-        {
-            "name": "test-artifacts-retain-on-failure-py-test-failing-chromium",
-            "children": [
-                {
-                    "name": re.compile(r".*webm"),
-                },
-                {
-                    "name": "test-failed-1.png",
-                },
-                {
-                    "name": "trace.zip",
-                },
-            ],
-        }
-    ]
-    _assert_folder_tree(test_results_dir, expected)
+    _assert_folder_structure(
+        test_results_dir,
+        """
+- test-artifacts-retain-on-failure-py-test-failing-chromium:
+  - test-failed-1.png
+  - trace.zip
+  - video.webm
+""",
+    )
 
 
 def test_should_work_with_test_names_which_exceeds_256_characters(
@@ -716,32 +688,36 @@ def test_should_work_with_test_names_which_exceeds_256_characters(
     result = testdir.runpytest("--tracing", "on")
     result.assert_outcomes(passed=1, failed=0)
     test_results_dir = os.path.join(testdir.tmpdir, "test-results")
-    expected = [
-        {
-            "name": "test-should-work-with-test-names-which-exceeds-256-characters-py-test-abcdefghijklmnopqrstuvwxyzabcd-23f2441-nopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz-chromium/",
-            "children": [
-                {
-                    "name": "trace.zip",
-                },
-            ],
-        },
-    ]
-    _assert_folder_tree(test_results_dir, expected)
+    _assert_folder_structure(
+        test_results_dir,
+        """
+- test-should-work-with-test-names-which-exceeds-256-characters-py-test-abcdefghijklmnopqrstuvwxyzabcd-23f2441-nopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz-chromium:
+  - trace.zip
+""",
+    )
 
 
-def _assert_folder_tree(root: str, expected_tree: List[Any]) -> None:
-    assert len(os.listdir(root)) == len(expected_tree)
-    for file in expected_tree:
-        if isinstance(file["name"], str):
-            if "children" in file:
-                assert os.path.isdir(os.path.join(root, file["name"]))
-            else:
-                assert os.path.isfile(os.path.join(root, file["name"]))
-        if isinstance(file["name"], re.Pattern):
-            assert any([file["name"].match(item) for item in os.listdir(root)])
-            assert "children" not in file
-        if "children" in file:
-            _assert_folder_tree(os.path.join(root, file["name"]), file["children"])
+def _make_folder_list(root: str, level: int = 0) -> str:
+    tree = []
+    for entry in sorted(os.scandir(root), key=lambda e: e.name):
+        prefix = f"{'  ' * level}- "
+        if entry.is_dir():
+            tree.append(f"{prefix}{entry.name}:\n")
+            tree.append(_make_folder_list(entry.path, level + 1))
+        else:
+            tree.append(f"{prefix}{entry.name}\n")
+    return "".join(tree)
+
+
+def _assert_folder_structure(root: str, expected: str) -> None:
+    __tracebackhide__ = True
+    actual = _make_folder_list(root)
+    if actual.strip() != expected.strip():
+        print("Actual:")
+        print(actual)
+        print("Expected:")
+        print(expected)
+        raise AssertionError("Actual tree does not match expected tree")
 
 
 def test_is_able_to_set_expect_timeout_via_conftest(testdir: pytest.Testdir) -> None:
