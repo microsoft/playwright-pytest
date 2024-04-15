@@ -635,11 +635,11 @@ def test_artifacts_should_store_everything_if_on(testdir: pytest.Testdir) -> Non
 - test-artifacts-should-store-everything-if-on-py-test-failing-chromium:
   - test-failed-1.png
   - trace.zip
-  - video.wem
+  - video.webm
 - test-artifacts-should-store-everything-if-on-py-test-passing-chromium:
   - test-finished-1.png
   - trace.zip
-  - video.wem
+  - video.webm
 """,
     )
 
@@ -670,7 +670,7 @@ def test_artifacts_retain_on_failure(testdir: pytest.Testdir) -> None:
 - test-artifacts-retain-on-failure-py-test-failing-chromium:
   - test-failed-1.png
   - trace.zip
-  - video.wem
+  - video.webm
 """,
     )
 
