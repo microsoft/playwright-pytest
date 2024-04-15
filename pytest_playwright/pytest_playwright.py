@@ -297,15 +297,14 @@ def context(
         failed and video_option == "retain-on-failure"
     )
     if preserve_video:
-        for page in pages:
+        for i, page in enumerate(pages):
             video = page.video
             if not video:
                 continue
             try:
-                video_path = video.path()
-                file_name = os.path.basename(video_path)
+                video_name = "video.webm" if len(pages) == 1 else f"video-{i+1}.webm"
                 video.save_as(
-                    path=_build_artifact_test_folder(pytestconfig, request, file_name)
+                    path=_build_artifact_test_folder(pytestconfig, request, video_name)
                 )
             except Error:
                 # Silent catch empty videos.
