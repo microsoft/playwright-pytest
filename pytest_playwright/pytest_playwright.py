@@ -521,6 +521,14 @@ class ArtifactsRecorder:
                 except Error:
                     # Silent catch empty videos.
                     pass
+        else:
+            for page in self._all_pages:
+                # Can be changed to "if page.video" without try/except once https://github.com/microsoft/playwright-python/pull/2410 is released and widely adopted.
+                if video_option in ["on", "retain-on-failure"]:
+                    try:
+                        page.video.delete()
+                    except Error:
+                        pass
 
     def on_did_create_browser_context(self, context: BrowserContext) -> None:
         context.on("page", lambda page: self._all_pages.append(page))
