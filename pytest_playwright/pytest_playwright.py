@@ -309,25 +309,30 @@ def new_context(
     browser_context_args: Dict,
     _artifacts_recorder: "ArtifactsRecorder",
     request: pytest.FixtureRequest,
-) -> CreateContextCallback:
+) -> Generator[CreateContextCallback, None, None]:
     browser_context_args = browser_context_args.copy()
     context_args_marker = next(request.node.iter_markers("browser_context_args"), None)
     additional_context_args = context_args_marker.kwargs if context_args_marker else {}
     browser_context_args.update(additional_context_args)
+    contexts: List[BrowserContext] = []
 
     def _new_context(**kwargs: Any) -> BrowserContext:
         context = browser.new_context(**browser_context_args, **kwargs)
         original_close = context.close
 
-        def close_wrapper(*args: Any, **kwargs: Any) -> None:
+        def _close_wrapper(*args: Any, **kwargs: Any) -> None:
+            contexts.remove(context)
             _artifacts_recorder.on_will_close_browser_context(context)
             original_close(*args, **kwargs)
 
-        context.close = close_wrapper
+        context.close = _close_wrapper
+        contexts.append(context)
         _artifacts_recorder.on_did_create_browser_context(context)
         return context
 
-    return cast(CreateContextCallback, _new_context)
+    yield cast(CreateContextCallback, _new_context)
+    for context in contexts.copy():
+        context.close()
 
 
 @pytest.fixture
@@ -452,8 +457,8 @@ class ArtifactsRecorder:
         self._pytestconfig = pytestconfig
         self._playwright = playwright
 
-        self._open_contexts: BrowserContext = []
         self._all_pages: List[Page] = []
+        self._screenshots: List[str] = []
         self._traces: List[str] = []
         self._tracing_option = pytestconfig.getoption("--tracing")
         self._capture_trace = self._tracing_option in ["on", "retain-on-failure"]
@@ -464,44 +469,34 @@ class ArtifactsRecorder:
             failed and screenshot_option == "only-on-failure"
         )
         if capture_screenshot:
-            for index, page in enumerate(self._all_pages):
+            for index, screenshot in enumerate(self._screenshots):
                 human_readable_status = "failed" if failed else "finished"
                 screenshot_path = _build_artifact_test_folder(
                     self._pytestconfig,
                     self._request,
                     f"test-{human_readable_status}-{index+1}.png",
                 )
-                try:
-                    page.screenshot(
-                        timeout=5000,
-                        path=screenshot_path,
-                        full_page=self._pytestconfig.getoption(
-                            "--full-page-screenshot"
-                        ),
-                    )
-                except Error:
-                    pass
-
-        # Close contexts which were not closed during the test (this will trigger Trace and Video generation)
-        while len(self._open_contexts) > 0:
-            self._open_contexts[0].close()
+                os.makedirs(os.path.dirname(screenshot_path), exist_ok=True)
+                shutil.move(screenshot, screenshot_path)
+        else:
+            for screenshot in self._screenshots:
+                os.remove(screenshot)
 
         if self._tracing_option == "on" or (
             failed and self._tracing_option == "retain-on-failure"
         ):
             for index, trace in enumerate(self._traces):
-                retain_trace = self._capture_trace or failed
                 trace_file_name = (
                     "trace.zip" if len(self._traces) == 1 else f"trace-{index+1}.zip"
                 )
                 trace_path = _build_artifact_test_folder(
                     self._pytestconfig, self._request, trace_file_name
                 )
-                if retain_trace:
-                    os.makedirs(os.path.dirname(trace_path), exist_ok=True)
-                    shutil.move(trace, trace_path)
-                else:
-                    os.remove(trace)
+                os.makedirs(os.path.dirname(trace_path), exist_ok=True)
+                shutil.move(trace, trace_path)
+        else:
+            for trace in self._traces:
+                os.remove(trace)
 
         video_option = self._pytestconfig.getoption("--video")
         preserve_video = video_option == "on" or (
@@ -528,7 +523,6 @@ class ArtifactsRecorder:
                     pass
 
     def on_did_create_browser_context(self, context: BrowserContext) -> None:
-        self._open_contexts.append(context)
         context.on("page", lambda page: self._all_pages.append(page))
         if self._request and self._capture_trace:
             context.tracing.start(
@@ -539,14 +533,27 @@ class ArtifactsRecorder:
             )
 
     def on_will_close_browser_context(self, context: BrowserContext) -> None:
-        if context in self._open_contexts:
-            self._open_contexts.remove(context)
         if self._capture_trace:
             trace_path = Path(artifacts_folder.name) / create_guid()
             context.tracing.stop(path=trace_path)
             self._traces.append(str(trace_path))
         else:
             context.tracing.stop()
+
+        if self._pytestconfig.getoption("--screenshot") in ["on", "only-on-failure"]:
+            for page in context.pages:
+                try:
+                    screenshot_path = Path(artifacts_folder.name) / create_guid()
+                    page.screenshot(
+                        timeout=5000,
+                        path=screenshot_path,
+                        full_page=self._pytestconfig.getoption(
+                            "--full-page-screenshot"
+                        ),
+                    )
+                    self._screenshots.append(str(screenshot_path))
+                except Error:
+                    pass
 
 
 def create_guid() -> str:
