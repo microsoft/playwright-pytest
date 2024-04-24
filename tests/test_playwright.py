@@ -389,6 +389,31 @@ def test_xdist(testdir: pytest.Testdir) -> None:
     assert "gw1" in "\n".join(result.outlines)
 
 
+def test_xdist_should_not_print_any_warnings(testdir: pytest.Testdir) -> None:
+    original = os.environ.get("PYTHONWARNINGS")
+    os.environ["PYTHONWARNINGS"] = "always"
+    try:
+        testdir.makepyfile(
+            """
+            import pytest
+
+            def test_default(page):
+                pass
+        """
+        )
+        result = testdir.runpytest(
+            "--numprocesses",
+            "2",
+        )
+        result.assert_outcomes(passed=1)
+        assert "ResourceWarning" not in "".join(result.stderr.lines)
+    finally:
+        if original is not None:
+            os.environ["PYTHONWARNINGS"] = original
+        else:
+            del os.environ["PYTHONWARNINGS"]
+
+
 def test_headed(testdir: pytest.Testdir) -> None:
     testdir.makepyfile(
         """

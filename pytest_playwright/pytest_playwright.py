@@ -51,7 +51,17 @@ from playwright.sync_api import (
 from slugify import slugify
 import tempfile
 
-artifacts_folder = tempfile.TemporaryDirectory(prefix="playwright-pytest-")
+
+@pytest.fixture(scope="session")
+def _pw_artifacts_folder() -> Generator[tempfile.TemporaryDirectory, None, None]:
+    artifacts_folder = tempfile.TemporaryDirectory(prefix="playwright-pytest-")
+    yield artifacts_folder
+    try:
+        # On Windows, files can be still in use.
+        # https://github.com/microsoft/playwright-pytest/issues/163
+        artifacts_folder.cleanup()
+    except (PermissionError, NotADirectoryError):
+        pass
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -193,6 +203,7 @@ def browser_context_args(
     playwright: Playwright,
     device: Optional[str],
     base_url: Optional[str],
+    _pw_artifacts_folder: tempfile.TemporaryDirectory,
 ) -> Dict:
     context_args = {}
     if device:
@@ -203,7 +214,7 @@ def browser_context_args(
     video_option = pytestconfig.getoption("--video")
     capture_video = video_option in ["on", "retain-on-failure"]
     if capture_video:
-        context_args["record_video_dir"] = artifacts_folder.name
+        context_args["record_video_dir"] = _pw_artifacts_folder.name
 
     return context_args
 
@@ -213,8 +224,11 @@ def _artifacts_recorder(
     request: pytest.FixtureRequest,
     playwright: Playwright,
     pytestconfig: Any,
+    _pw_artifacts_folder: tempfile.TemporaryDirectory,
 ) -> Generator["ArtifactsRecorder", None, None]:
-    artifacts_recorder = ArtifactsRecorder(pytestconfig, request, playwright)
+    artifacts_recorder = ArtifactsRecorder(
+        pytestconfig, request, playwright, _pw_artifacts_folder
+    )
     yield artifacts_recorder
     # If request.node is missing rep_call, then some error happened during execution
     # that prevented teardown, but should still be counted as a failure
@@ -252,12 +266,6 @@ def browser(launch_browser: Callable[[], Browser]) -> Generator[Browser, None, N
     browser = launch_browser()
     yield browser
     browser.close()
-    try:
-        # On Windows, files can be still in use.
-        # https://github.com/microsoft/playwright-pytest/issues/163
-        artifacts_folder.cleanup()
-    except (PermissionError, NotADirectoryError):
-        pass
 
 
 class CreateContextCallback(Protocol):
@@ -451,11 +459,16 @@ def pytest_addoption(parser: Any) -> None:
 
 class ArtifactsRecorder:
     def __init__(
-        self, pytestconfig: Any, request: pytest.FixtureRequest, playwright: Playwright
+        self,
+        pytestconfig: Any,
+        request: pytest.FixtureRequest,
+        playwright: Playwright,
+        pw_artifacts_folder: tempfile.TemporaryDirectory,
     ) -> None:
         self._request = request
         self._pytestconfig = pytestconfig
         self._playwright = playwright
+        self._pw_artifacts_folder = pw_artifacts_folder
 
         self._all_pages: List[Page] = []
         self._screenshots: List[str] = []
@@ -542,7 +555,7 @@ class ArtifactsRecorder:
 
     def on_will_close_browser_context(self, context: BrowserContext) -> None:
         if self._capture_trace:
-            trace_path = Path(artifacts_folder.name) / create_guid()
+            trace_path = Path(self._pw_artifacts_folder.name) / create_guid()
             context.tracing.stop(path=trace_path)
             self._traces.append(str(trace_path))
         else:
@@ -551,7 +564,9 @@ class ArtifactsRecorder:
         if self._pytestconfig.getoption("--screenshot") in ["on", "only-on-failure"]:
             for page in context.pages:
                 try:
-                    screenshot_path = Path(artifacts_folder.name) / create_guid()
+                    screenshot_path = (
+                        Path(self._pw_artifacts_folder.name) / create_guid()
+                    )
                     page.screenshot(
                         timeout=5000,
                         path=screenshot_path,
