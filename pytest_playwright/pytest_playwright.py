@@ -70,7 +70,7 @@ def delete_output_dir(pytestconfig: Any) -> None:
     if os.path.exists(output_dir):
         try:
             shutil.rmtree(output_dir)
-        except FileNotFoundError:
+        except (FileNotFoundError, PermissionError):
             # When running in parallel, another thread may have already deleted the files
             pass
         except OSError as error:
