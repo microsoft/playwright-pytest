@@ -102,6 +102,18 @@ def pytest_configure(config: Any) -> None:
         "markers",
         "browser_context_args(**kwargs): provide additional arguments to browser.new_context()",
     )
+    config.addinivalue_line(
+        "markers",
+        "tracing(flag): whether to enable trace and generate trace.zip for each use case. default: off",
+    )
+    config.addinivalue_line(
+        "markers",
+        "screenshot(flag): whether to open screenshots for separate testing. default: off",
+    )
+    config.addinivalue_line(
+        "markers",
+        "video(flag): Record video for individual use cases. default: off ",
+    )
 
 
 # Making test result information available in fixtures
@@ -474,12 +486,20 @@ class ArtifactsRecorder:
         self._screenshots: List[str] = []
         self._traces: List[str] = []
         self._tracing_option = pytestconfig.getoption("--tracing")
+        self._screenshot_option = pytestconfig.getoption("--screenshot")
+        self._video_option = pytestconfig.getoption("--video")
+        self._tracing_mark = next(self._request.node.iter_markers("tracing"), False)
+        self._video_mark = next(self._request.node.iter_markers("video"), False)
+        if self._tracing_mark and self._tracing_mark.args:
+            self._tracing_option = self._tracing_mark.args[0]
+        if self._video_mark and self._video_mark.args:
+            self._video_option = self._video_mark.args[0]
+
         self._capture_trace = self._tracing_option in ["on", "retain-on-failure"]
 
     def did_finish_test(self, failed: bool) -> None:
-        screenshot_option = self._pytestconfig.getoption("--screenshot")
-        capture_screenshot = screenshot_option == "on" or (
-            failed and screenshot_option == "only-on-failure"
+        capture_screenshot = self._screenshot_option == "on" or (
+                failed and self._screenshot_option == "only-on-failure"
         )
         if capture_screenshot:
             for index, screenshot in enumerate(self._screenshots):
@@ -510,10 +530,8 @@ class ArtifactsRecorder:
         else:
             for trace in self._traces:
                 os.remove(trace)
-
-        video_option = self._pytestconfig.getoption("--video")
-        preserve_video = video_option == "on" or (
-            failed and video_option == "retain-on-failure"
+        preserve_video = self._video_option == "on" or (
+                failed and self._video_option == "retain-on-failure"
         )
         if preserve_video:
             for index, page in enumerate(self._all_pages):
@@ -537,7 +555,7 @@ class ArtifactsRecorder:
         else:
             for page in self._all_pages:
                 # Can be changed to "if page.video" without try/except once https://github.com/microsoft/playwright-python/pull/2410 is released and widely adopted.
-                if video_option in ["on", "retain-on-failure"]:
+                if self._video_option in ["on", "retain-on-failure"]:
                     try:
                         page.video.delete()
                     except Error:
@@ -560,8 +578,10 @@ class ArtifactsRecorder:
             self._traces.append(str(trace_path))
         else:
             context.tracing.stop()
-
-        if self._pytestconfig.getoption("--screenshot") in ["on", "only-on-failure"]:
+        screenshot_mark = next(self._request.node.iter_markers("screenshot"), False)
+        if screenshot_mark and screenshot_mark.args:
+            self._screenshot_option = screenshot_mark.args[0]
+        if self._screenshot_option in ["on", "only-on-failure"]:
             for page in context.pages:
                 try:
                     screenshot_path = (

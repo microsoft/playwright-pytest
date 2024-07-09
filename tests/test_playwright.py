@@ -910,3 +910,41 @@ def test_new_context_allow_passing_args(
     )
     result = testdir.runpytest()
     result.assert_outcomes(passed=1)
+
+
+def test_mark_by_trace_on(testdir):
+    testdir.makepyfile(
+        """
+        import pytest
+        
+        @pytest.mark.tracing("on")
+        @pytest.mark.screenshot("on")
+        @pytest.mark.video("on")
+        def test_success(page):
+            assert 2 == page.evaluate("1 + 1")
+        
+        @pytest.mark.tracing("on")
+        @pytest.mark.screenshot("on")
+        @pytest.mark.video("on")
+        def test_fail(page):
+            raise Exception("Failed")
+        """
+    )
+    # result = testdir.runpytest( "--video", "on")
+    result = testdir.runpytest()
+    result.assert_outcomes(passed=1, failed=1)
+    test_results_dir = os.path.join(testdir.tmpdir, "test-results")
+    top = os.walk(test_results_dir)
+    _assert_folder_structure(
+        test_results_dir,
+        """
+- test-mark-by-trace-on-py-test-fail-chromium:
+  - test-failed-1.png
+  - trace.zip
+  - video.webm
+- test-mark-by-trace-on-py-test-success-chromium:
+  - test-finished-1.png
+  - trace.zip
+  - video.webm
+"""
+    )
