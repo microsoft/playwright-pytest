@@ -925,7 +925,7 @@ def test_artifacts_should_store_everything_if_mark_is_on(testdir: pytest.Testdir
         
         @pytest.mark.tracing
         @pytest.mark.screenshot("on")
-        @pytest.mark.video("on")
+        @pytest.mark.video
         def test_failing(page):
             raise Exception("Failed")
     """
@@ -939,9 +939,11 @@ def test_artifacts_should_store_everything_if_mark_is_on(testdir: pytest.Testdir
 - test-artifacts-should-store-everything-if-mark-is-on-py-test-failing-chromium:
   - test-failed-1.png
   - trace.zip
+  - video.webm
 - test-artifacts-should-store-everything-if-mark-is-on-py-test-passing-chromium:
   - test-finished-1.png
   - trace.zip
+  - video.webm
 """,
     )
 
@@ -968,7 +970,8 @@ def test_artifacts_should_store_everything_if_mark_is_off(testdir: pytest.Testdi
     result.assert_outcomes(passed=1, failed=1)
     test_results_dir = os.path.join(testdir.tmpdir, "test-results")
     _assert_folder_structure(
-        test_results_dir, "",
+        test_results_dir,
+        "",
     )
 
 
@@ -998,6 +1001,7 @@ def test_artifacts_should_store_everything_if_mark_is_on_failure(testdir: pytest
 - test-artifacts-should-store-everything-if-mark-is-on-failure-py-test-failing-chromium:
   - test-failed-1.png
   - trace.zip
+  - video.webm
 """,
     )
 
@@ -1007,11 +1011,11 @@ def test_artifacts_should_store_everything_mark_and_option_all_exist(testdir: py
         """
         import pytest
 
-        # @pytest.mark.tracing("retain_on_failure")
-        # @pytest.mark.screenshot("only-on-failure")
-        # @pytest.mark.video("retain_on_failure")
-        # def test_passing(page):
-        #     assert 2 == page.evaluate("1 + 1")
+        @pytest.mark.tracing("retain_on_failure")
+        @pytest.mark.screenshot("only-on-failure")
+        @pytest.mark.video("retain_on_failure")
+        def test_passing(page):
+            assert 2 == page.evaluate("1 + 1")
 
         @pytest.mark.tracing("retain-on-failure")
         @pytest.mark.screenshot("only-on-failure")
@@ -1025,7 +1029,7 @@ def test_artifacts_should_store_everything_mark_and_option_all_exist(testdir: py
     test_results_dir = os.path.join(testdir.tmpdir, "test-results")
     _assert_folder_structure(
         test_results_dir, """
-- test-artifacts-should-store-everything-if-mark-is-on-failure-py-test-failing-chromium:
+- test-artifacts-should-store-everything-mark-and-option-all-exist-py-test-failing-chromium:
   - test-failed-1.png
   - trace.zip
   - video.webm

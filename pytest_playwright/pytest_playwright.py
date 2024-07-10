@@ -337,8 +337,9 @@ def new_context(
     browser_context_args.update(additional_context_args)
     if "record_video_dir" not in browser_context_args.keys():
         video_mark = next(request.node.iter_markers("video"), None)
-        if (video_mark and len(video_mark.args) > 0 \
-                and video_mark.args[0] in ["on", "retain-on-failure"]):
+        if video_mark and (
+                not video_mark.args or video_mark.args[0] in ["on", "retain-on-failure"]
+        ):
             browser_context_args.update(
                 {"record_video_dir": _artifacts_recorder._pw_artifacts_folder.name})
 
