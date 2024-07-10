@@ -102,6 +102,18 @@ def pytest_configure(config: Any) -> None:
         "markers",
         "browser_context_args(**kwargs): provide additional arguments to browser.new_context()",
     )
+    config.addinivalue_line(
+        "markers",
+        "tracing(flag): mark test case opening tracing. default:on",
+    )
+    config.addinivalue_line(
+        "markers",
+        "screenshot(flag): mark use case opening screenshot. default:on",
+    )
+    config.addinivalue_line(
+        "markers",
+        "video(flag): mark the use case to start recording. default:on",
+    )
 
 
 # Making test result information available in fixtures
@@ -318,11 +330,17 @@ def new_context(
     _artifacts_recorder: "ArtifactsRecorder",
     request: pytest.FixtureRequest,
 ) -> Generator[CreateContextCallback, None, None]:
+    contexts: List[BrowserContext] = []
     browser_context_args = browser_context_args.copy()
     context_args_marker = next(request.node.iter_markers("browser_context_args"), None)
     additional_context_args = context_args_marker.kwargs if context_args_marker else {}
     browser_context_args.update(additional_context_args)
-    contexts: List[BrowserContext] = []
+    if "record_video_dir" not in browser_context_args.keys():
+        video_mark = next(request.node.iter_markers("video"), None)
+        if (video_mark and len(video_mark.args) > 0 \
+                and video_mark.args[0] in ["on", "retain-on-failure"]):
+            browser_context_args.update(
+                {"record_video_dir": _artifacts_recorder._pw_artifacts_folder.name})
 
     def _new_context(**kwargs: Any) -> BrowserContext:
         context = browser.new_context(**browser_context_args, **kwargs)
@@ -473,13 +491,24 @@ class ArtifactsRecorder:
         self._all_pages: List[Page] = []
         self._screenshots: List[str] = []
         self._traces: List[str] = []
-        self._tracing_option = pytestconfig.getoption("--tracing")
+        self._tracing_option = self._get_trace_mark("tracing")
+        self._screenshot_option = self._get_trace_mark("screenshot")
+        self._video_option = self._get_trace_mark("video")
         self._capture_trace = self._tracing_option in ["on", "retain-on-failure"]
 
+    def _get_trace_mark(self, flag: Literal["tracing", "screenshot", "video"]):
+        _option = self._pytestconfig.getoption(f"--{flag}")
+        _mark = next(self._request.node.iter_markers(flag), False)
+        if _mark:
+            if len(_mark.args) == 0:
+                _option = "on"
+            else:
+                _option = _mark.args[0]
+        return _option
+
     def did_finish_test(self, failed: bool) -> None:
-        screenshot_option = self._pytestconfig.getoption("--screenshot")
-        capture_screenshot = screenshot_option == "on" or (
-            failed and screenshot_option == "only-on-failure"
+        capture_screenshot = self._screenshot_option == "on" or (
+                failed and self._screenshot_option == "only-on-failure"
         )
         if capture_screenshot:
             for index, screenshot in enumerate(self._screenshots):
@@ -511,7 +540,7 @@ class ArtifactsRecorder:
             for trace in self._traces:
                 os.remove(trace)
 
-        video_option = self._pytestconfig.getoption("--video")
+        video_option = self._video_option
         preserve_video = video_option == "on" or (
             failed and video_option == "retain-on-failure"
         )
@@ -561,7 +590,7 @@ class ArtifactsRecorder:
         else:
             context.tracing.stop()
 
-        if self._pytestconfig.getoption("--screenshot") in ["on", "only-on-failure"]:
+        if self._screenshot_option in ["on", "only-on-failure"]:
             for page in context.pages:
                 try:
                     screenshot_path = (
