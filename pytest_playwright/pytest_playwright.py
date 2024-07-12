@@ -186,12 +186,12 @@ def _build_artifact_test_folder(
     output_dir = pytestconfig.getoption("--output")
     return os.path.join(
         output_dir,
-        truncate_file_name(slugify(request.node.nodeid)),
-        truncate_file_name(folder_or_file_name),
+        _truncate_file_name(slugify(request.node.nodeid)),
+        _truncate_file_name(folder_or_file_name),
     )
 
 
-def truncate_file_name(file_name: str) -> str:
+def _truncate_file_name(file_name: str) -> str:
     if len(file_name) < 256:
         return file_name
     return f"{file_name[:100]}-{hashlib.sha256(file_name.encode()).hexdigest()[:7]}-{file_name[-100:]}"
@@ -555,7 +555,7 @@ class ArtifactsRecorder:
 
     def on_will_close_browser_context(self, context: BrowserContext) -> None:
         if self._capture_trace:
-            trace_path = Path(self._pw_artifacts_folder.name) / create_guid()
+            trace_path = Path(self._pw_artifacts_folder.name) / _create_guid()
             context.tracing.stop(path=trace_path)
             self._traces.append(str(trace_path))
         else:
@@ -565,7 +565,7 @@ class ArtifactsRecorder:
             for page in context.pages:
                 try:
                     screenshot_path = (
-                        Path(self._pw_artifacts_folder.name) / create_guid()
+                        Path(self._pw_artifacts_folder.name) / _create_guid()
                     )
                     page.screenshot(
                         timeout=5000,
@@ -579,5 +579,5 @@ class ArtifactsRecorder:
                     pass
 
 
-def create_guid() -> str:
+def _create_guid() -> str:
     return hashlib.sha256(os.urandom(16)).hexdigest()
