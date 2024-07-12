@@ -1,7 +1,7 @@
 black==24.3.0
 pytest-cov==3.0.0
 mypy==0.961
-setuptools==65.5.1
+setuptools==70.3.0
 twine==4.0.1
 wheel==0.38.1
 flake8==4.0.1
