@@ -475,6 +475,7 @@ class ArtifactsRecorder:
         self._traces: List[str] = []
         self._tracing_option = pytestconfig.getoption("--tracing")
         self._capture_trace = self._tracing_option in ["on", "retain-on-failure"]
+        self._videos: List[str] = []
 
     def did_finish_test(self, failed: bool) -> None:
         screenshot_option = self._pytestconfig.getoption("--screenshot")
@@ -531,6 +532,7 @@ class ArtifactsRecorder:
                             self._pytestconfig, self._request, video_file_name
                         )
                     )
+                    self._videos.append(video_file_name)
                 except Error:
                     # Silent catch empty videos.
                     pass
@@ -542,6 +544,7 @@ class ArtifactsRecorder:
                         page.video.delete()
                     except Error:
                         pass
+        self._request.node.playwright_videos = self._videos
 
     def on_did_create_browser_context(self, context: BrowserContext) -> None:
         context.on("page", lambda page: self._all_pages.append(page))
@@ -560,6 +563,7 @@ class ArtifactsRecorder:
             self._traces.append(str(trace_path))
         else:
             context.tracing.stop()
+        self._request.node.playwright_traces = self._traces
 
         if self._pytestconfig.getoption("--screenshot") in ["on", "only-on-failure"]:
             for page in context.pages:
@@ -577,7 +581,7 @@ class ArtifactsRecorder:
                     self._screenshots.append(str(screenshot_path))
                 except Error:
                     pass
-
+        self._request.node.playwright_screenshots = self._screenshots
 
 def _create_guid() -> str:
     return hashlib.sha256(os.urandom(16)).hexdigest()
