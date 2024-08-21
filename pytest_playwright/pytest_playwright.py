@@ -583,5 +583,6 @@ class ArtifactsRecorder:
                     pass
         self._request.node.playwright_screenshots = self._screenshots
 
+
 def _create_guid() -> str:
     return hashlib.sha256(os.urandom(16)).hexdigest()
