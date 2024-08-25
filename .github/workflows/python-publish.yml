@@ -5,12 +5,6 @@ name: Upload Python Package
 on:
   release:
     types: [published]
-  # == TEMP
-  pull_request:
-    branches:
-      - "*"
-  # == TEMP
-
 jobs:
   deploy-conda:
     runs-on: ubuntu-latest
@@ -26,8 +20,8 @@ jobs:
       - name: Prepare
         run: conda install anaconda-client conda-build conda-verify
       - name: Build and Upload
-        # env:
-        #   ANACONDA_API_TOKEN: ${{ secrets.ANACONDA_API_TOKEN }}
+        env:
+          ANACONDA_API_TOKEN: ${{ secrets.ANACONDA_API_TOKEN }}
         run: |
-          # conda config --set anaconda_upload yes
+          conda config --set anaconda_upload yes
           conda build --user microsoft .
