@@ -775,8 +775,9 @@ def test_artifact_collection_should_work_for_manually_created_contexts_keep_open
     testdir.makepyfile(
         """
         import pytest
+        from pytest_playwright.pytest_playwright import CreateContextCallback
 
-        def test_artifact_collection(browser, page, new_context):
+        def test_artifact_collection(browser, page, new_context: CreateContextCallback):
             page.goto("data:text/html,<div>hello</div>")
 
             other_context = new_context()
