@@ -16,7 +16,7 @@ jobs:
         uses: conda-incubator/setup-miniconda@v3
         with:
           python-version: 3.9
-          channels: conda-forge,microsoft
+          channels: microsoft,conda-forge
       - name: Prepare
         run: conda install anaconda-client conda-build conda-verify
       - name: Build and Upload
