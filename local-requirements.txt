@@ -6,5 +6,5 @@ twine==4.0.1
 wheel==0.38.1
 flake8==4.0.1
 pre-commit==2.19.0
-Django==3.2.25
+Django==4.2.16
 pytest-xdist==2.5.0
