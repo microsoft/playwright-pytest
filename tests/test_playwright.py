@@ -644,14 +644,18 @@ def test_artifacts_new_folder_on_run(
 def test_artifacts_should_store_everything_if_on(testdir: pytest.Testdir) -> None:
     testdir.makepyfile(
         """
-        def test_passing(page):
+        def test_passing(page, output_path):
+            print(f"\\n\\noutput_path = {output_path}\\n\\n")
             assert 2 == page.evaluate("1 + 1")
 
-        def test_failing(page):
+        def test_failing(page, output_path):
+            print(f"\\n\\noutput_path = {output_path}\\n\\n")
             raise Exception("Failed")
     """
     )
-    result = testdir.runpytest("--screenshot", "on", "--video", "on", "--tracing", "on")
+    result = testdir.runpytest(
+        "--screenshot", "on", "--video", "on", "--tracing", "on", "-s"
+    )
     result.assert_outcomes(passed=1, failed=1)
     test_results_dir = os.path.join(testdir.tmpdir, "test-results")
     _assert_folder_structure(
@@ -667,6 +671,18 @@ def test_artifacts_should_store_everything_if_on(testdir: pytest.Testdir) -> Non
   - video.webm
 """,
     )
+    output_path = str(testdir.tmpdir)
+    output_paths = [
+        line[14:] for line in result.outlines if f"output_path = {output_path}" in line
+    ]
+    assert output_paths == [
+        testdir.tmpdir.join(
+            "test-results/test-artifacts-should-store-everything-if-on-py-test-passing-chromium"
+        ).strpath,
+        testdir.tmpdir.join(
+            "test-results/test-artifacts-should-store-everything-if-on-py-test-failing-chromium"
+        ).strpath,
+    ]
 
 
 def test_artifacts_retain_on_failure(testdir: pytest.Testdir) -> None:
@@ -911,3 +927,42 @@ def test_new_context_allow_passing_args(
     )
     result = testdir.runpytest()
     result.assert_outcomes(passed=1)
+
+
+def test_output_path_via_pytest_runtest_makereport_hook(
+    testdir: pytest.Testdir,
+) -> None:
+    testdir.makeconftest(
+        """
+import pytest
+
+@pytest.hookimpl(hookwrapper=True)
+def pytest_runtest_makereport(item, call):
+    outcome = yield
+    report = outcome.get_result()
+
+    if report.when == "call":
+        output_path = item.funcargs.get("output_path")
+        print("\\n\\noutput_path = {}".format(output_path))
+"""
+    )
+
+    testdir.makepyfile(
+        """
+def test_without_output_path():
+    pass
+
+def test_with_page(page):
+    pass
+"""
+    )
+
+    result = testdir.runpytest("--screenshot", "on", "-s")
+    result.assert_outcomes(passed=2)
+    output_paths = [line[14:] for line in result.outlines if "output_path = " in line]
+    assert output_paths == [
+        "None",
+        testdir.tmpdir.join(
+            "test-results/test-output-path-via-pytest-runtest-makereport-hook-py-test-with-page-chromium"
+        ).strpath,
+    ]
