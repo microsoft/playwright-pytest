@@ -180,15 +180,10 @@ def _is_debugger_attached() -> bool:
     return debugger.is_attached()
 
 
-def _build_artifact_test_folder(
-    pytestconfig: Any, request: pytest.FixtureRequest, folder_or_file_name: str
-) -> str:
-    output_dir = pytestconfig.getoption("--output")
-    return os.path.join(
-        output_dir,
-        _truncate_file_name(slugify(request.node.nodeid)),
-        _truncate_file_name(folder_or_file_name),
-    )
+@pytest.fixture
+def output_path(pytestconfig: Any, request: pytest.FixtureRequest) -> str:
+    output_dir = Path(pytestconfig.getoption("--output")).absolute()
+    return os.path.join(output_dir, _truncate_file_name(slugify(request.node.nodeid)))
 
 
 def _truncate_file_name(file_name: str) -> str:
@@ -222,12 +217,13 @@ def browser_context_args(
 @pytest.fixture()
 def _artifacts_recorder(
     request: pytest.FixtureRequest,
+    output_path: str,
     playwright: Playwright,
     pytestconfig: Any,
     _pw_artifacts_folder: tempfile.TemporaryDirectory,
 ) -> Generator["ArtifactsRecorder", None, None]:
     artifacts_recorder = ArtifactsRecorder(
-        pytestconfig, request, playwright, _pw_artifacts_folder
+        pytestconfig, request, output_path, playwright, _pw_artifacts_folder
     )
     yield artifacts_recorder
     # If request.node is missing rep_call, then some error happened during execution
@@ -462,12 +458,14 @@ class ArtifactsRecorder:
         self,
         pytestconfig: Any,
         request: pytest.FixtureRequest,
+        output_path: str,
         playwright: Playwright,
         pw_artifacts_folder: tempfile.TemporaryDirectory,
     ) -> None:
         self._request = request
         self._pytestconfig = pytestconfig
         self._playwright = playwright
+        self._output_path = output_path
         self._pw_artifacts_folder = pw_artifacts_folder
 
         self._all_pages: List[Page] = []
@@ -475,6 +473,12 @@ class ArtifactsRecorder:
         self._traces: List[str] = []
         self._tracing_option = pytestconfig.getoption("--tracing")
         self._capture_trace = self._tracing_option in ["on", "retain-on-failure"]
+
+    def _build_artifact_test_folder(self, folder_or_file_name: str) -> str:
+        return os.path.join(
+            self._output_path,
+            _truncate_file_name(folder_or_file_name),
+        )
 
     def did_finish_test(self, failed: bool) -> None:
         screenshot_option = self._pytestconfig.getoption("--screenshot")
@@ -484,9 +488,7 @@ class ArtifactsRecorder:
         if capture_screenshot:
             for index, screenshot in enumerate(self._screenshots):
                 human_readable_status = "failed" if failed else "finished"
-                screenshot_path = _build_artifact_test_folder(
-                    self._pytestconfig,
-                    self._request,
+                screenshot_path = self._build_artifact_test_folder(
                     f"test-{human_readable_status}-{index+1}.png",
                 )
                 os.makedirs(os.path.dirname(screenshot_path), exist_ok=True)
@@ -502,9 +504,7 @@ class ArtifactsRecorder:
                 trace_file_name = (
                     "trace.zip" if len(self._traces) == 1 else f"trace-{index+1}.zip"
                 )
-                trace_path = _build_artifact_test_folder(
-                    self._pytestconfig, self._request, trace_file_name
-                )
+                trace_path = self._build_artifact_test_folder(trace_file_name)
                 os.makedirs(os.path.dirname(trace_path), exist_ok=True)
                 shutil.move(trace, trace_path)
         else:
@@ -527,9 +527,7 @@ class ArtifactsRecorder:
                         else f"video-{index+1}.webm"
                     )
                     video.save_as(
-                        path=_build_artifact_test_folder(
-                            self._pytestconfig, self._request, video_file_name
-                        )
+                        path=self._build_artifact_test_folder(video_file_name)
                     )
                 except Error:
                     # Silent catch empty videos.
