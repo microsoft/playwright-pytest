@@ -209,10 +209,7 @@ def pytest_runtest_setup(item: Any) -> None:
 
 
 def pytest_configure(config: pytest.Config) -> None:
-    if (
-        config.getini("playwright_pytest_asyncio") is None
-        and config.pluginmanager.hasplugin("asyncio")
-    ) or config.getini("playwright_pytest_asyncio"):
+    if config.getini("playwright_pytest_asyncio"):
         from pytest_playwright.asyncio import PytestPlaywrightAsyncio
 
         config.pluginmanager.register(PytestPlaywrightAsyncio())

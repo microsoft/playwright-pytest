@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import asyncio
 import shutil
 import os
 import sys
@@ -188,7 +187,7 @@ class PytestPlaywrightAsyncio(PytestPlaywright):
 
         return context_args
 
-    @pytest_asyncio.fixture()
+    @pytest_asyncio.fixture(loop_scope="session")
     async def _artifacts_recorder(
         self,
         request: pytest.FixtureRequest,
@@ -207,18 +206,11 @@ class PytestPlaywrightAsyncio(PytestPlaywright):
         )
         await artifacts_recorder.did_finish_test(failed)
 
-    @pytest_asyncio.fixture(scope="session")
+    @pytest_asyncio.fixture(scope="session", loop_scope="session")
     async def playwright(self) -> AsyncGenerator[Playwright, None]:
         pw = await async_playwright().start()
         yield pw
         await pw.stop()
-
-    @pytest.fixture(scope="session")
-    def event_loop(self) -> Generator[asyncio.AbstractEventLoop, None, None]:
-        policy = asyncio.get_event_loop_policy()
-        loop = policy.new_event_loop()
-        yield loop
-        loop.close()
 
     @pytest.fixture(scope="session")
     def browser_type(self, playwright: Playwright, browser_name: str) -> BrowserType:
@@ -237,7 +229,7 @@ class PytestPlaywrightAsyncio(PytestPlaywright):
 
         return launch
 
-    @pytest_asyncio.fixture(scope="session")
+    @pytest_asyncio.fixture(scope="session", loop_scope="session")
     async def browser(
         self, launch_browser: Callable[[], Browser]
     ) -> AsyncGenerator[Browser, None]:
@@ -245,7 +237,7 @@ class PytestPlaywrightAsyncio(PytestPlaywright):
         yield browser
         await browser.close()
 
-    @pytest_asyncio.fixture
+    @pytest_asyncio.fixture(loop_scope="session")
     async def new_context(
         self,
         browser: Browser,
@@ -281,11 +273,11 @@ class PytestPlaywrightAsyncio(PytestPlaywright):
         for context in contexts.copy():
             await context.close()
 
-    @pytest_asyncio.fixture
+    @pytest_asyncio.fixture(loop_scope="session")
     async def context(self, new_context: CreateContextCallback) -> BrowserContext:
         return await new_context()
 
-    @pytest_asyncio.fixture
+    @pytest_asyncio.fixture(loop_scope="session")
     async def page(self, context: BrowserContext) -> Page:
         return await context.new_page()
 

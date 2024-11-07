@@ -18,6 +18,34 @@ import sys
 import pytest
 
 
+@pytest.fixture(autouse=True)
+def _set_default_ini_file(testdir: pytest.Testdir) -> None:
+    testdir.makeconftest(
+        """
+        import pytest
+
+        from pytest_asyncio import is_async_test
+
+        def pytest_collection_modifyitems(items):
+            pytest_asyncio_tests = (item for item in items if is_async_test(item))
+            session_scope_marker = pytest.mark.asyncio(loop_scope="session")
+            for async_test in pytest_asyncio_tests:
+                async_test.add_marker(session_scope_marker, append=False)
+        """
+    )
+
+
+def makeconftest(testdir: pytest.Testdir, content: str) -> None:
+    lines = content.split("\n")
+    spaces = [len(line) - len(line.lstrip()) for line in lines if line.strip()]
+    min_spaces = min(spaces) if spaces else 0
+    lines = [line[min_spaces:] for line in lines]
+
+    testdir.makeconftest(
+        testdir.tmpdir.join("conftest.py").read_text("utf8") + "\n" + "\n".join(lines)
+    )
+
+
 def test_default(testdir: pytest.Testdir) -> None:
     testdir.makepyfile(
         """
@@ -112,14 +140,13 @@ def test_multiple_browsers(testdir: pytest.Testdir) -> None:
 
 
 def test_browser_context_args(testdir: pytest.Testdir) -> None:
-    testdir.makeconftest(
+    makeconftest(
+        testdir,
         """
-        import pytest
-
         @pytest.fixture(scope="session")
         def browser_context_args():
             return {"user_agent": "foobar"}
-    """
+    """,
     )
     testdir.makepyfile(
         """
@@ -134,14 +161,15 @@ def test_browser_context_args(testdir: pytest.Testdir) -> None:
 
 
 def test_user_defined_browser_context_args(testdir: pytest.Testdir) -> None:
-    testdir.makeconftest(
+    makeconftest(
+        testdir,
         """
         import pytest
 
         @pytest.fixture(scope="session")
         def browser_context_args():
             return {"user_agent": "foobar"}
-    """
+    """,
     )
     testdir.makepyfile(
         """
@@ -159,14 +187,15 @@ def test_user_defined_browser_context_args(testdir: pytest.Testdir) -> None:
 
 
 def test_user_defined_browser_context_args_clear_again(testdir: pytest.Testdir) -> None:
-    testdir.makeconftest(
+    makeconftest(
+        testdir,
         """
         import pytest
 
         @pytest.fixture(scope="session")
         def browser_context_args():
             return {"user_agent": "foobar"}
-    """
+    """,
     )
     testdir.makepyfile(
         """
@@ -428,7 +457,8 @@ def test_invalid_browser_name(testdir: pytest.Testdir) -> None:
 
 
 def test_browser_context_args_device(testdir: pytest.Testdir) -> None:
-    testdir.makeconftest(
+    makeconftest(
+        testdir,
         """
         import pytest
 
@@ -436,7 +466,7 @@ def test_browser_context_args_device(testdir: pytest.Testdir) -> None:
         def browser_context_args(browser_context_args, playwright):
             iphone_11 = playwright.devices['iPhone 11 Pro']
             return {**browser_context_args, **iphone_11}
-    """
+    """,
     )
     testdir.makepyfile(
         """
@@ -451,7 +481,8 @@ def test_browser_context_args_device(testdir: pytest.Testdir) -> None:
 
 
 def test_launch_persistent_context_session(testdir: pytest.Testdir) -> None:
-    testdir.makeconftest(
+    makeconftest(
+        testdir,
         """
         import pytest_asyncio
         from playwright.sync_api import BrowserType
@@ -470,7 +501,7 @@ def test_launch_persistent_context_session(testdir: pytest.Testdir) -> None:
             })
             yield context
             await context.close()
-    """
+    """,
     )
     testdir.makepyfile(
         """
@@ -485,7 +516,8 @@ def test_launch_persistent_context_session(testdir: pytest.Testdir) -> None:
 
 
 def test_context_page_on_session_level(testdir: pytest.Testdir) -> None:
-    testdir.makeconftest(
+    makeconftest(
+        testdir,
         """
         import pytest
         from playwright.sync_api import Browser, BrowserContext
@@ -509,7 +541,7 @@ def test_context_page_on_session_level(testdir: pytest.Testdir) -> None:
         ):
             page = await context.new_page()
             yield page
-    """
+    """,
     )
     testdir.makepyfile(
         """
@@ -529,14 +561,15 @@ def test_context_page_on_session_level(testdir: pytest.Testdir) -> None:
 
 
 def test_launch_persistent_context_function(testdir: pytest.Testdir) -> None:
-    testdir.makeconftest(
+    makeconftest(
+        testdir,
         """
         import pytest
         from playwright.sync_api import BrowserType
         import pytest_asyncio
         from typing import Dict
 
-        @pytest_asyncio.fixture()
+        @pytest_asyncio.fixture(loop_scope="session")
         async def context(
             browser_type: BrowserType,
             browser_type_launch_args: Dict,
@@ -549,7 +582,7 @@ def test_launch_persistent_context_function(testdir: pytest.Testdir) -> None:
             })
             yield context
             await context.close()
-    """
+    """,
     )
     testdir.makepyfile(
         """
@@ -751,11 +784,12 @@ def _assert_folder_structure(root: str, expected: str) -> None:
 
 
 def test_is_able_to_set_expect_timeout_via_conftest(testdir: pytest.Testdir) -> None:
-    testdir.makeconftest(
+    makeconftest(
+        testdir,
         """
         from playwright.async_api import expect
         expect.set_options(timeout=1111)
-    """
+    """,
     )
     testdir.makepyfile(
         """
