@@ -65,4 +65,4 @@ jobs:
       - name: Prepare
         run: conda install conda-build conda-verify
       - name: Build
-        run: conda build .
+        run: conda build --user microsoft .
