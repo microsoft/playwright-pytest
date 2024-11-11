@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import os
+from pathlib import Path
 import sys
 
 import pytest
@@ -438,6 +439,8 @@ def test_invalid_browser_name(testdir: pytest.Testdir) -> None:
 
 
 def test_django(testdir: pytest.Testdir) -> None:
+    # Workaround for https://github.com/pytest-dev/pytest/issues/10651
+    os.environ.setdefault("PYTHONPATH", str(Path(__file__).parent.parent))
     testdir.makepyfile(
         """
     from django.test import TestCase
