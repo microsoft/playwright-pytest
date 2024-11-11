@@ -439,7 +439,7 @@ def test_invalid_browser_name(testdir: pytest.Testdir) -> None:
 
 
 def test_django(testdir: pytest.Testdir) -> None:
-    # Workaroud for https://github.com/pytest-dev/pytest/issues/10651
+    # Workaround for https://github.com/pytest-dev/pytest/issues/10651
     os.environ.setdefault("PYTHONPATH", str(Path(__file__).parent.parent))
     testdir.makepyfile(
         """
