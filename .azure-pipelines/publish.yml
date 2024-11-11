@@ -36,7 +36,7 @@ extends:
         - script: |
             python -m pip install --upgrade pip
             pip install -r local-requirements.txt
-            python setup.py sdist bdist_wheel
+            python -m build --sdist
           displayName: 'Install & Build'
         - task: EsrpRelease@7
           inputs:
