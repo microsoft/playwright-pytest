@@ -815,6 +815,7 @@ def test_artifact_collection_should_work_for_manually_created_contexts_get_close
             other_context = new_context()
             other_context_page = other_context.new_page()
             other_context_page.goto("data:text/html,<div>hello</div>")
+            other_context_page.evaluate("new Promise(fulfill => requestAnimationFrame(() => requestAnimationFrame(fulfill)))")
             other_context.close()
         """
     )
