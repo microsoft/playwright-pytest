@@ -14,7 +14,6 @@
 
 import shutil
 import os
-import sys
 import pytest_asyncio
 from pathlib import Path
 from typing import (
@@ -52,7 +51,6 @@ import tempfile
 from pytest_playwright.pytest_playwright import (
     PytestPlaywright,
     _create_guid,
-    _is_debugger_attached,
     _truncate_file_name,
 )
 
@@ -100,45 +98,6 @@ class CreateContextCallback(Protocol):
 
 
 class PytestPlaywrightAsyncio(PytestPlaywright):
-    @pytest.fixture(scope="session")
-    def browser_type_launch_args(self, pytestconfig: Any) -> Dict:
-        launch_options = {}
-        headed_option = pytestconfig.getoption("--headed")
-        if headed_option:
-            launch_options["headless"] = False
-        elif self.VSCODE_PYTHON_EXTENSION_ID in sys.argv[0] and _is_debugger_attached():
-            # When the VSCode debugger is attached, then launch the browser headed by default
-            launch_options["headless"] = False
-        browser_channel_option = pytestconfig.getoption("--browser-channel")
-        if browser_channel_option:
-            launch_options["channel"] = browser_channel_option
-        slowmo_option = pytestconfig.getoption("--slowmo")
-        if slowmo_option:
-            launch_options["slow_mo"] = slowmo_option
-        return launch_options
-
-    @pytest.fixture(scope="session")
-    def browser_context_args(
-        self,
-        pytestconfig: Any,
-        playwright: Playwright,
-        device: Optional[str],
-        base_url: Optional[str],
-        _pw_artifacts_folder: tempfile.TemporaryDirectory,
-    ) -> Dict:
-        context_args = {}
-        if device:
-            context_args.update(playwright.devices[device])
-        if base_url:
-            context_args["base_url"] = base_url
-
-        video_option = pytestconfig.getoption("--video")
-        capture_video = video_option in ["on", "retain-on-failure"]
-        if capture_video:
-            context_args["record_video_dir"] = _pw_artifacts_folder.name
-
-        return context_args
-
     @pytest_asyncio.fixture(loop_scope="session")
     async def _artifacts_recorder(
         self,
