@@ -13,10 +13,43 @@
 # limitations under the License.
 
 import os
-from pathlib import Path
 import sys
 
 import pytest
+
+
+@pytest.fixture(autouse=True)
+def _set_default_ini_file(testdir: pytest.Testdir) -> None:
+    testdir.makeconftest(
+        """
+        import pytest
+
+        from pytest_asyncio import is_async_test
+
+        def pytest_collection_modifyitems(items):
+            pytest_asyncio_tests = (item for item in items if is_async_test(item))
+            session_scope_marker = pytest.mark.asyncio(loop_scope="session")
+            for async_test in pytest_asyncio_tests:
+                async_test.add_marker(session_scope_marker, append=False)
+        """
+    )
+    testdir.makeini(
+        """
+        [pytest]
+        playwright_pytest_asyncio = True
+    """
+    )
+
+
+def makeconftest(testdir: pytest.Testdir, content: str) -> None:
+    lines = content.split("\n")
+    spaces = [len(line) - len(line.lstrip()) for line in lines if line.strip()]
+    min_spaces = min(spaces) if spaces else 0
+    lines = [line[min_spaces:] for line in lines]
+
+    testdir.makeconftest(
+        testdir.tmpdir.join("conftest.py").read_text("utf8") + "\n" + "\n".join(lines)
+    )
 
 
 def test_default(testdir: pytest.Testdir) -> None:
@@ -24,12 +57,13 @@ def test_default(testdir: pytest.Testdir) -> None:
         """
         import pytest
 
-        def test_default(page, browser_name):
+        @pytest.mark.asyncio
+        async def test_default(page, browser_name):
             assert browser_name == "chromium"
-            user_agent = page.evaluate("window.navigator.userAgent")
+            user_agent = await page.evaluate("window.navigator.userAgent")
             assert "HeadlessChrome" in user_agent
-            page.set_content('<span id="foo">bar</span>')
-            assert page.query_selector("#foo")
+            await page.set_content('<span id="foo">bar</span>')
+            assert await page.query_selector("#foo")
     """
     )
     result = testdir.runpytest()
@@ -40,11 +74,13 @@ def test_slowmo(testdir: pytest.Testdir) -> None:
     testdir.makepyfile(
         """
         from time import monotonic
-        def test_slowmo(page):
+        import pytest
+        @pytest.mark.asyncio
+        async def test_slowmo(page):
             email = "test@test.com"
-            page.set_content("<input type='text'/>")
+            await page.set_content("<input type='text'/>")
             start_time = monotonic()
-            page.type("input", email)
+            await page.type("input", email)
             end_time = monotonic()
             assert end_time - start_time >= 1
             assert end_time - start_time < 2
@@ -68,7 +104,8 @@ def test_browser_channel(channel: str, testdir: pytest.Testdir) -> None:
         f"""
         import pytest
 
-        def test_browser_channel(page, browser_name, browser_channel):
+        @pytest.mark.asyncio
+        async def test_browser_channel(page, browser_name, browser_channel):
             assert browser_name == "chromium"
             assert browser_channel == "{channel}"
     """
@@ -82,7 +119,8 @@ def test_invalid_browser_channel(testdir: pytest.Testdir) -> None:
         """
         import pytest
 
-        def test_browser_channel(page, browser_name, browser_channel):
+        @pytest.mark.asyncio
+        async def test_browser_channel(page, browser_name, browser_channel):
             assert browser_name == "chromium"
     """
     )
@@ -91,55 +129,13 @@ def test_invalid_browser_channel(testdir: pytest.Testdir) -> None:
     assert "Unsupported chromium channel" in "\n".join(result.outlines)
 
 
-def test_unittest_class(testdir: pytest.Testdir) -> None:
-    testdir.makepyfile(
-        """
-        import pytest
-        import unittest
-        from playwright.sync_api import Page
-
-
-        class MyTest(unittest.TestCase):
-            @pytest.fixture(autouse=True)
-            def setup(self, page: Page):
-                self.page = page
-
-            def test_foobar(self):
-                assert self.page.evaluate("1 + 1") == 2
-    """
-    )
-    result = testdir.runpytest("--browser", "chromium")
-    result.assert_outcomes(passed=1)
-
-
-def test_unittest_class_multiple_browsers(testdir: pytest.Testdir) -> None:
-    testdir.makepyfile(
-        """
-        import pytest
-        import unittest
-        from playwright.sync_api import Page
-
-
-        class MyTest(unittest.TestCase):
-            @pytest.fixture(autouse=True)
-            def setup(self, page: Page):
-                self.page = page
-
-            def test_foobar(self):
-                assert "Firefox" in self.page.evaluate("navigator.userAgent")
-                assert self.page.evaluate("1 + 1") == 2
-    """
-    )
-    result = testdir.runpytest("--browser", "firefox", "--browser", "webkit")
-    result.assert_outcomes(passed=1)
-    assert any("multiple browsers is not supported" in line for line in result.outlines)
-
-
 def test_multiple_browsers(testdir: pytest.Testdir) -> None:
     testdir.makepyfile(
         """
-        def test_multiple_browsers(page):
-            page.set_content('<span id="foo">bar</span>')
+        import pytest
+        @pytest.mark.asyncio
+        async def test_multiple_browsers(page):
+            await page.set_content('<span id="foo">bar</span>')
             assert page.query_selector("#foo")
     """
     )
@@ -150,19 +146,20 @@ def test_multiple_browsers(testdir: pytest.Testdir) -> None:
 
 
 def test_browser_context_args(testdir: pytest.Testdir) -> None:
-    testdir.makeconftest(
+    makeconftest(
+        testdir,
         """
-        import pytest
-
         @pytest.fixture(scope="session")
         def browser_context_args():
             return {"user_agent": "foobar"}
-    """
+    """,
     )
     testdir.makepyfile(
         """
-        def test_browser_context_args(page):
-            assert page.evaluate("window.navigator.userAgent") == "foobar"
+        import pytest
+        @pytest.mark.asyncio
+        async def test_browser_context_args(page):
+            assert await page.evaluate("window.navigator.userAgent") == "foobar"
     """
     )
     result = testdir.runpytest()
@@ -170,23 +167,25 @@ def test_browser_context_args(testdir: pytest.Testdir) -> None:
 
 
 def test_user_defined_browser_context_args(testdir: pytest.Testdir) -> None:
-    testdir.makeconftest(
+    makeconftest(
+        testdir,
         """
         import pytest
 
         @pytest.fixture(scope="session")
         def browser_context_args():
             return {"user_agent": "foobar"}
-    """
+    """,
     )
     testdir.makepyfile(
         """
         import pytest
 
         @pytest.mark.browser_context_args(user_agent="overwritten", locale="new-locale")
-        def test_browser_context_args(page):
-            assert page.evaluate("window.navigator.userAgent") == "overwritten"
-            assert page.evaluate("window.navigator.languages") == ["new-locale"]
+        @pytest.mark.asyncio
+        async def test_browser_context_args(page):
+            assert await page.evaluate("window.navigator.userAgent") == "overwritten"
+            assert await page.evaluate("window.navigator.languages") == ["new-locale"]
     """
     )
     result = testdir.runpytest()
@@ -194,25 +193,28 @@ def test_user_defined_browser_context_args(testdir: pytest.Testdir) -> None:
 
 
 def test_user_defined_browser_context_args_clear_again(testdir: pytest.Testdir) -> None:
-    testdir.makeconftest(
+    makeconftest(
+        testdir,
         """
         import pytest
 
         @pytest.fixture(scope="session")
         def browser_context_args():
             return {"user_agent": "foobar"}
-    """
+    """,
     )
     testdir.makepyfile(
         """
         import pytest
 
         @pytest.mark.browser_context_args(user_agent="overwritten")
-        def test_browser_context_args(page):
-            assert page.evaluate("window.navigator.userAgent") == "overwritten"
+        @pytest.mark.asyncio
+        async def test_browser_context_args(page):
+            assert await page.evaluate("window.navigator.userAgent") == "overwritten"
 
-        def test_browser_context_args2(page):
-            assert page.evaluate("window.navigator.userAgent") == "foobar"
+        @pytest.mark.asyncio
+        async def test_browser_context_args2(page):
+            assert await page.evaluate("window.navigator.userAgent") == "foobar"
     """
     )
     result = testdir.runpytest()
@@ -222,7 +224,9 @@ def test_user_defined_browser_context_args_clear_again(testdir: pytest.Testdir) 
 def test_chromium(testdir: pytest.Testdir) -> None:
     testdir.makepyfile(
         """
-        def test_is_chromium(page, browser_name, is_chromium, is_firefox, is_webkit):
+        import pytest
+        @pytest.mark.asyncio
+        async def test_is_chromium(page, browser_name, is_chromium, is_firefox, is_webkit):
             assert browser_name == "chromium"
             assert is_chromium
             assert is_firefox is False
@@ -236,7 +240,9 @@ def test_chromium(testdir: pytest.Testdir) -> None:
 def test_firefox(testdir: pytest.Testdir) -> None:
     testdir.makepyfile(
         """
-        def test_is_firefox(page, browser_name, is_chromium, is_firefox, is_webkit):
+        import pytest
+        @pytest.mark.asyncio
+        async def test_is_firefox(page, browser_name, is_chromium, is_firefox, is_webkit):
             assert browser_name == "firefox"
             assert is_chromium is False
             assert is_firefox
@@ -250,7 +256,9 @@ def test_firefox(testdir: pytest.Testdir) -> None:
 def test_webkit(testdir: pytest.Testdir) -> None:
     testdir.makepyfile(
         """
-        def test_is_webkit(page, browser_name, is_chromium, is_firefox, is_webkit):
+        import pytest
+        @pytest.mark.asyncio
+        async def test_is_webkit(page, browser_name, is_chromium, is_firefox, is_webkit):
             assert browser_name == "webkit"
             assert is_chromium is False
             assert is_firefox is False
@@ -264,11 +272,13 @@ def test_webkit(testdir: pytest.Testdir) -> None:
 def test_goto(testdir: pytest.Testdir) -> None:
     testdir.makepyfile(
         """
-        def test_base_url(page, base_url):
+        import pytest
+        @pytest.mark.asyncio
+        async def test_base_url(page, base_url):
             assert base_url == "https://example.com"
-            page.goto("/foobar")
+            await page.goto("/foobar")
             assert page.url == "https://example.com/foobar"
-            page.goto("https://example.org")
+            await page.goto("https://example.org")
             assert page.url == "https://example.org/"
     """
     )
@@ -285,9 +295,10 @@ def test_base_url_via_fixture(testdir: pytest.Testdir) -> None:
         def base_url():
             return "https://example.com"
 
-        def test_base_url(page, base_url):
+        @pytest.mark.asyncio
+        async def test_base_url(page, base_url):
             assert base_url == "https://example.com"
-            page.goto("/foobar")
+            await page.goto("/foobar")
             assert page.url == "https://example.com/foobar"
     """
     )
@@ -301,7 +312,8 @@ def test_skip_browsers(testdir: pytest.Testdir) -> None:
         import pytest
 
         @pytest.mark.skip_browser("firefox")
-        def test_base_url(page, browser_name):
+        @pytest.mark.asyncio
+        async def test_base_url(page, browser_name):
             assert browser_name in ["chromium", "webkit"]
     """
     )
@@ -317,7 +329,8 @@ def test_only_browser(testdir: pytest.Testdir) -> None:
         import pytest
 
         @pytest.mark.only_browser("firefox")
-        def test_base_url(page, browser_name):
+        @pytest.mark.asyncio
+        async def test_base_url(page, browser_name):
             assert browser_name == "firefox"
     """
     )
@@ -330,10 +343,13 @@ def test_only_browser(testdir: pytest.Testdir) -> None:
 def test_parameterization(testdir: pytest.Testdir) -> None:
     testdir.makepyfile(
         """
-        def test_all_browsers(page):
+        import pytest
+        @pytest.mark.asyncio
+        async def test_all_browsers(page):
             pass
 
-        def test_without_browser():
+        @pytest.mark.asyncio
+        async def test_without_browser():
             pass
     """
     )
@@ -353,24 +369,29 @@ def test_parameterization(testdir: pytest.Testdir) -> None:
 def test_xdist(testdir: pytest.Testdir) -> None:
     testdir.makepyfile(
         """
-        def test_a(page):
-            page.set_content('<span id="foo">a</span>')
-            page.wait_for_timeout(200)
+        import pytest
+        @pytest.mark.asyncio
+        async def test_a(page):
+            await page.set_content('<span id="foo">a</span>')
+            await page.wait_for_timeout(200)
             assert page.query_selector("#foo")
 
-        def test_b(page):
-            page.wait_for_timeout(2000)
-            page.set_content('<span id="foo">a</span>')
+        @pytest.mark.asyncio
+        async def test_b(page):
+            await page.wait_for_timeout(2000)
+            await page.set_content('<span id="foo">a</span>')
             assert page.query_selector("#foo")
 
-        def test_c(page):
-            page.set_content('<span id="foo">a</span>')
-            page.wait_for_timeout(200)
+        @pytest.mark.asyncio
+        async def test_c(page):
+            await page.set_content('<span id="foo">a</span>')
+            await page.wait_for_timeout(200)
             assert page.query_selector("#foo")
 
-        def test_d(page):
-            page.set_content('<span id="foo">a</span>')
-            page.wait_for_timeout(200)
+        @pytest.mark.asyncio
+        async def test_d(page):
+            await page.set_content('<span id="foo">a</span>')
+            await page.wait_for_timeout(200)
             assert page.query_selector("#foo")
     """
     )
@@ -398,7 +419,8 @@ def test_xdist_should_not_print_any_warnings(testdir: pytest.Testdir) -> None:
             """
             import pytest
 
-            def test_default(page):
+            @pytest.mark.asyncio
+            async def test_default(page):
                 pass
         """
         )
@@ -418,8 +440,10 @@ def test_xdist_should_not_print_any_warnings(testdir: pytest.Testdir) -> None:
 def test_headed(testdir: pytest.Testdir) -> None:
     testdir.makepyfile(
         """
-        def test_base_url(page, browser_name):
-            user_agent = page.evaluate("window.navigator.userAgent")
+        import pytest
+        @pytest.mark.asyncio
+        async def test_base_url(page, browser_name):
+            user_agent = await page.evaluate("window.navigator.userAgent")
             assert "HeadlessChrome" not in user_agent
     """
     )
@@ -430,7 +454,7 @@ def test_headed(testdir: pytest.Testdir) -> None:
 def test_invalid_browser_name(testdir: pytest.Testdir) -> None:
     testdir.makepyfile(
         """
-        def test_base_url(page):
+        async def test_base_url(page):
             pass
     """
     )
@@ -438,24 +462,9 @@ def test_invalid_browser_name(testdir: pytest.Testdir) -> None:
     assert any(["--browser: invalid choice" in line for line in result.errlines])
 
 
-def test_django(testdir: pytest.Testdir) -> None:
-    # Workaround for https://github.com/pytest-dev/pytest/issues/10651
-    os.environ.setdefault("PYTHONPATH", str(Path(__file__).parent.parent))
-    testdir.makepyfile(
-        """
-    from django.test import TestCase
-    class Proj1Test(TestCase):
-        def test_one(self):
-            self.assertTrue(True)
-
-    """
-    )
-    result = testdir.runpytest()
-    result.assert_outcomes(passed=1)
-
-
 def test_browser_context_args_device(testdir: pytest.Testdir) -> None:
-    testdir.makeconftest(
+    makeconftest(
+        testdir,
         """
         import pytest
 
@@ -463,12 +472,14 @@ def test_browser_context_args_device(testdir: pytest.Testdir) -> None:
         def browser_context_args(browser_context_args, playwright):
             iphone_11 = playwright.devices['iPhone 11 Pro']
             return {**browser_context_args, **iphone_11}
-    """
+    """,
     )
     testdir.makepyfile(
         """
-        def test_browser_context_args(page):
-            assert "iPhone" in page.evaluate("window.navigator.userAgent")
+        import pytest
+        @pytest.mark.asyncio
+        async def test_browser_context_args(page):
+            assert "iPhone" in await page.evaluate("window.navigator.userAgent")
     """
     )
     result = testdir.runpytest()
@@ -476,31 +487,34 @@ def test_browser_context_args_device(testdir: pytest.Testdir) -> None:
 
 
 def test_launch_persistent_context_session(testdir: pytest.Testdir) -> None:
-    testdir.makeconftest(
+    makeconftest(
+        testdir,
         """
-        import pytest
+        import pytest_asyncio
         from playwright.sync_api import BrowserType
         from typing import Dict
 
-        @pytest.fixture(scope="session")
-        def context(
+        @pytest_asyncio.fixture(scope="session")
+        async def context(
             browser_type: BrowserType,
             browser_type_launch_args: Dict,
             browser_context_args: Dict
         ):
-            context = browser_type.launch_persistent_context("./foobar", **{
+            context = await browser_type.launch_persistent_context("./foobar", **{
                 **browser_type_launch_args,
                 **browser_context_args,
                 "locale": "de-DE",
             })
             yield context
-            context.close()
-    """
+            await context.close()
+    """,
     )
     testdir.makepyfile(
         """
-        def test_browser_context_args(page):
-            assert page.evaluate("navigator.language") == "de-DE"
+        import pytest
+        @pytest.mark.asyncio
+        async def test_browser_context_args(page):
+            assert await page.evaluate("navigator.language") == "de-DE"
     """
     )
     result = testdir.runpytest()
@@ -508,39 +522,44 @@ def test_launch_persistent_context_session(testdir: pytest.Testdir) -> None:
 
 
 def test_context_page_on_session_level(testdir: pytest.Testdir) -> None:
-    testdir.makeconftest(
+    makeconftest(
+        testdir,
         """
         import pytest
         from playwright.sync_api import Browser, BrowserContext
         from typing import Dict
+        import pytest_asyncio
 
-        @pytest.fixture(scope="session")
-        def context(
+        @pytest_asyncio.fixture(scope="session")
+        async def context(
             browser: Browser,
             browser_context_args: Dict
         ):
-            context = browser.new_context(**{
+            context = await browser.new_context(**{
                 **browser_context_args,
             })
             yield context
-            context.close()
+            await context.close()
 
-        @pytest.fixture(scope="session")
-        def page(
+        @pytest_asyncio.fixture(scope="session")
+        async def page(
             context: BrowserContext,
         ):
-            page = context.new_page()
+            page = await context.new_page()
             yield page
-    """
+    """,
     )
     testdir.makepyfile(
         """
-        def test_a(page):
-            page.goto("data:text/html,<div>B</div>")
-            assert page.text_content("div") == "B"
+        import pytest
+        @pytest.mark.asyncio
+        async def test_a(page):
+            await page.goto("data:text/html,<div>B</div>")
+            assert await page.text_content("div") == "B"
 
-        def test_b(page):
-            assert page.text_content("div") == "B"
+        @pytest.mark.asyncio
+        async def test_b(page):
+            assert await page.text_content("div") == "B"
         """
     )
     result = testdir.runpytest()
@@ -548,31 +567,35 @@ def test_context_page_on_session_level(testdir: pytest.Testdir) -> None:
 
 
 def test_launch_persistent_context_function(testdir: pytest.Testdir) -> None:
-    testdir.makeconftest(
+    makeconftest(
+        testdir,
         """
         import pytest
         from playwright.sync_api import BrowserType
+        import pytest_asyncio
         from typing import Dict
 
-        @pytest.fixture()
-        def context(
+        @pytest_asyncio.fixture(loop_scope="session")
+        async def context(
             browser_type: BrowserType,
             browser_type_launch_args: Dict,
             browser_context_args: Dict
         ):
-            context = browser_type.launch_persistent_context("./foobar", **{
+            context = await browser_type.launch_persistent_context("./foobar", **{
                 **browser_type_launch_args,
                 **browser_context_args,
                 "locale": "de-DE",
             })
             yield context
-            context.close()
-    """
+            await context.close()
+    """,
     )
     testdir.makepyfile(
         """
-        def test_browser_context_args(page):
-            assert page.evaluate("navigator.language") == "de-DE"
+        import pytest
+        @pytest.mark.asyncio
+        async def test_browser_context_args(page):
+            assert await page.evaluate("navigator.language") == "de-DE"
     """
     )
     result = testdir.runpytest()
@@ -583,9 +606,10 @@ def test_device_emulation(testdir: pytest.Testdir) -> None:
     testdir.makepyfile(
         """
         import pytest
-        def test_device_emulation(page, device):
+        @pytest.mark.asyncio
+        async def test_device_emulation(page, device):
             assert device == 'iPhone 11 Pro'
-            assert "iPhone" in page.evaluate("window.navigator.userAgent")
+            assert "iPhone" in await page.evaluate("window.navigator.userAgent")
     """
     )
     result = testdir.runpytest("--device", "iPhone 11 Pro")
@@ -597,8 +621,9 @@ def test_rep_call_keyboard_interrupt(testdir: pytest.Testdir) -> None:
         """
         import pytest
 
-        def test_rep_call(page):
-            assert page.evaluate("1 + 1") == 2
+        @pytest.mark.asyncio
+        async def test_rep_call(page):
+            assert await page.evaluate("1 + 1") == 2
             raise KeyboardInterrupt
     """
     )
@@ -611,10 +636,14 @@ def test_artifacts_by_default_it_should_not_store_anything(
 ) -> None:
     testdir.makepyfile(
         """
-        def test_passing(page):
-            assert 2 == page.evaluate("1 + 1")
+        import pytest
+        pytest.mark.asyncio
+        @pytest.mark.asyncio
+        async def test_passing(page):
+            assert 2 == await page.evaluate("1 + 1")
 
-        def test_failing(page):
+        @pytest.mark.asyncio
+        async def test_failing(page):
             raise Exception("Failed")
     """
     )
@@ -634,8 +663,10 @@ def test_artifacts_new_folder_on_run(
 
     testdir.makepyfile(
         """
-        def test_passing(page):
-            assert 2 == page.evaluate("1 + 1")
+        import pytest
+        @pytest.mark.asyncio
+        async def test_passing(page):
+            assert 2 == await page.evaluate("1 + 1")
     """
     )
     result = testdir.runpytest()
@@ -647,11 +678,14 @@ def test_artifacts_new_folder_on_run(
 def test_artifacts_should_store_everything_if_on(testdir: pytest.Testdir) -> None:
     testdir.makepyfile(
         """
-        def test_passing(page, output_path):
+        import pytest
+        @pytest.mark.asyncio
+        async def test_passing(page, output_path):
             print(f"\\n\\noutput_path = {output_path}\\n\\n")
-            assert 2 == page.evaluate("1 + 1")
+            assert 2 == await page.evaluate("1 + 1")
 
-        def test_failing(page, output_path):
+        @pytest.mark.asyncio
+        async def test_failing(page, output_path):
             print(f"\\n\\noutput_path = {output_path}\\n\\n")
             raise Exception("Failed")
     """
@@ -691,10 +725,13 @@ def test_artifacts_should_store_everything_if_on(testdir: pytest.Testdir) -> Non
 def test_artifacts_retain_on_failure(testdir: pytest.Testdir) -> None:
     testdir.makepyfile(
         """
-        def test_passing(page):
-            assert 2 == page.evaluate("1 + 1")
+        import pytest
+        @pytest.mark.asyncio
+        async def test_passing(page):
+            assert 2 == await page.evaluate("1 + 1")
 
-        def test_failing(page):
+        @pytest.mark.asyncio
+        async def test_failing(page):
             raise Exception("Failed")
     """
     )
@@ -725,7 +762,9 @@ def test_should_work_with_test_names_which_exceeds_256_characters(
     long_test_name = "abcdefghijklmnopqrstuvwxyz" * 100
     testdir.makepyfile(
         f"""
-        def test_{long_test_name}(page):
+        import pytest
+        @pytest.mark.asyncio
+        async def test_{long_test_name}(page):
             pass
     """
     )
@@ -767,19 +806,22 @@ def _assert_folder_structure(root: str, expected: str) -> None:
 
 
 def test_is_able_to_set_expect_timeout_via_conftest(testdir: pytest.Testdir) -> None:
-    testdir.makeconftest(
+    makeconftest(
+        testdir,
         """
-        from playwright.sync_api import expect
+        from playwright.async_api import expect
         expect.set_options(timeout=1111)
-    """
+    """,
     )
     testdir.makepyfile(
         """
-        from playwright.sync_api import expect
+        from playwright.async_api import expect
+        import pytest
 
-        def test_small_timeout(page):
-            page.goto("data:text/html,")
-            expect(page.locator("#A")).to_be_visible()
+        @pytest.mark.asyncio
+        async def test_small_timeout(page):
+            await page.goto("data:text/html,")
+            await expect(page.locator("#A")).to_be_visible()
     """
     )
     result = testdir.runpytest()
@@ -794,14 +836,16 @@ def test_artifact_collection_should_work_for_manually_created_contexts_keep_open
     testdir.makepyfile(
         """
         import pytest
-        from pytest_playwright.pytest_playwright import CreateContextCallback
+        from pytest_playwright.asyncio import CreateContextCallback
 
-        def test_artifact_collection(browser, page, new_context: CreateContextCallback):
-            page.goto("data:text/html,<div>hello</div>")
+        @pytest.mark.asyncio
+        async def test_artifact_collection(browser, page, new_context: CreateContextCallback):
+            await page.goto("data:text/html,<div>hello</div>")
 
-            other_context = new_context()
-            other_context_page = other_context.new_page()
-            other_context_page.goto("data:text/html,<div>hello</div>")
+            other_context = await new_context()
+            other_context_page = await other_context.new_page()
+            await other_context_page.goto("data:text/html,<div>hello</div>")
+            await other_context_page.evaluate("new Promise(fulfill => requestAnimationFrame(() => requestAnimationFrame(fulfill)))")
         """
     )
     result = testdir.runpytest("--screenshot", "on", "--video", "on", "--tracing", "on")
@@ -828,14 +872,15 @@ def test_artifact_collection_should_work_for_manually_created_contexts_get_close
         """
         import pytest
 
-        def test_artifact_collection(browser, page, new_context):
-            page.goto("data:text/html,<div>hello</div>")
+        @pytest.mark.asyncio
+        async def test_artifact_collection(browser, page, new_context):
+            await page.goto("data:text/html,<div>hello</div>")
 
-            other_context = new_context()
-            other_context_page = other_context.new_page()
-            other_context_page.goto("data:text/html,<div>hello</div>")
-            other_context_page.evaluate("new Promise(fulfill => requestAnimationFrame(() => requestAnimationFrame(fulfill)))")
-            other_context.close()
+            other_context = await new_context()
+            other_context_page = await other_context.new_page()
+            await other_context_page.goto("data:text/html,<div>hello</div>")
+            await other_context_page.evaluate("new Promise(fulfill => requestAnimationFrame(() => requestAnimationFrame(fulfill)))")
+            await other_context.close()
         """
     )
     result = testdir.runpytest("--video", "on", "--tracing", "on")
@@ -860,12 +905,13 @@ def test_artifact_collection_should_work_for_manually_created_contexts_retain_on
         """
         import pytest
 
-        def test_artifact_collection(browser, page, new_context):
-            page.goto("data:text/html,<div>hello</div>")
+        @pytest.mark.asyncio
+        async def test_artifact_collection(browser, page, new_context):
+            await page.goto("data:text/html,<div>hello</div>")
 
-            other_context = new_context()
-            other_context_page = other_context.new_page()
-            other_context_page.goto("data:text/html,<div>hello</div>")
+            other_context = await new_context()
+            other_context_page = await other_context.new_page()
+            await other_context_page.goto("data:text/html,<div>hello</div>")
 
             raise Exception("Failed")
         """
@@ -894,12 +940,13 @@ def test_artifact_collection_should_work_for_manually_created_contexts_retain_on
         """
         import pytest
 
-        def test_artifact_collection(browser, page, new_context):
-            page.goto("data:text/html,<div>hello</div>")
+        @pytest.mark.asyncio
+        async def test_artifact_collection(browser, page, new_context):
+            await page.goto("data:text/html,<div>hello</div>")
 
-            other_context = new_context()
-            other_context_page = other_context.new_page()
-            other_context_page.goto("data:text/html,<div>hello</div>")
+            other_context = await new_context()
+            other_context_page = await other_context.new_page()
+            await other_context_page.goto("data:text/html,<div>hello</div>")
         """
     )
     result = testdir.runpytest(
@@ -917,16 +964,17 @@ def test_new_context_allow_passing_args(
         """
         import pytest
 
-        def test_artifact_collection(new_context):
-            context1 = new_context(user_agent="agent1")
-            page1 = context1.new_page()
-            assert page1.evaluate("window.navigator.userAgent") == "agent1"
-            context1.close()
+        @pytest.mark.asyncio
+        async def test_artifact_collection(new_context):
+            context1 = await new_context(user_agent="agent1")
+            page1 = await context1.new_page()
+            assert await page1.evaluate("window.navigator.userAgent") == "agent1"
+            await context1.close()
 
-            context2 = new_context(user_agent="agent2")
-            page2 = context2.new_page()
-            assert page2.evaluate("window.navigator.userAgent") == "agent2"
-            context2.close()
+            context2 = await new_context(user_agent="agent2")
+            page2 = await context2.new_page()
+            assert await page2.evaluate("window.navigator.userAgent") == "agent2"
+            await context2.close()
             """
     )
     result = testdir.runpytest()
