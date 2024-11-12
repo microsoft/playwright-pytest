@@ -4,7 +4,7 @@ mypy==0.961
 build==1.2.2.post1
 twine==4.0.1
 wheel==0.38.1
-flake8==4.0.1
-pre-commit==2.19.0
+flake8==7.1.1
+pre-commit==4.0.1
 Django==4.2.16
 pytest-xdist==2.5.0

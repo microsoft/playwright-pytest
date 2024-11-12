@@ -303,8 +303,7 @@ class CreateContextCallback(Protocol):
         record_har_url_filter: Optional[Union[str, Pattern[str]]] = None,
         record_har_mode: Optional[Literal["full", "minimal"]] = None,
         record_har_content: Optional[Literal["attach", "embed", "omit"]] = None,
-    ) -> BrowserContext:
-        ...
+    ) -> BrowserContext: ...
 
 
 @pytest.fixture
@@ -489,7 +488,7 @@ class ArtifactsRecorder:
             for index, screenshot in enumerate(self._screenshots):
                 human_readable_status = "failed" if failed else "finished"
                 screenshot_path = self._build_artifact_test_folder(
-                    f"test-{human_readable_status}-{index+1}.png",
+                    f"test-{human_readable_status}-{index + 1}.png",
                 )
                 os.makedirs(os.path.dirname(screenshot_path), exist_ok=True)
                 shutil.move(screenshot, screenshot_path)
@@ -502,7 +501,7 @@ class ArtifactsRecorder:
         ):
             for index, trace in enumerate(self._traces):
                 trace_file_name = (
-                    "trace.zip" if len(self._traces) == 1 else f"trace-{index+1}.zip"
+                    "trace.zip" if len(self._traces) == 1 else f"trace-{index + 1}.zip"
                 )
                 trace_path = self._build_artifact_test_folder(trace_file_name)
                 os.makedirs(os.path.dirname(trace_path), exist_ok=True)
@@ -524,7 +523,7 @@ class ArtifactsRecorder:
                     video_file_name = (
                         "video.webm"
                         if len(self._all_pages) == 1
-                        else f"video-{index+1}.webm"
+                        else f"video-{index + 1}.webm"
                     )
                     video.save_as(
                         path=self._build_artifact_test_folder(video_file_name)
