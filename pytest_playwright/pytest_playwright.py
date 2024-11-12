@@ -319,7 +319,7 @@ def pytest_runtest_setup(item: pytest.Item) -> None:
 
 def pytest_configure(config: pytest.Config) -> None:
     if config.getini("playwright_pytest_asyncio"):
-        from pytest_playwright.asyncio import PytestPlaywrightAsyncio
+        from pytest_playwright.async_api import PytestPlaywrightAsyncio
 
         config.pluginmanager.register(PytestPlaywrightAsyncio())
     else:

@@ -836,7 +836,7 @@ def test_artifact_collection_should_work_for_manually_created_contexts_keep_open
     testdir.makepyfile(
         """
         import pytest
-        from pytest_playwright.asyncio import CreateContextCallback
+        from pytest_playwright.async_api import CreateContextCallback
 
         @pytest.mark.asyncio
         async def test_artifact_collection(browser, page, new_context: CreateContextCallback):
