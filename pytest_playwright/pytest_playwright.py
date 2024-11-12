@@ -14,10 +14,13 @@
 
 from pathlib import Path
 from re import Pattern
+import shutil
 import sys
+import tempfile
 from typing import (
     Any,
     Dict,
+    Generator,
     List,
     Literal,
     Optional,
@@ -38,6 +41,7 @@ from playwright.sync_api import (
     Geolocation,
     ViewportSize,
 )
+from slugify import slugify
 
 
 class CreateContextCallback(Protocol):
@@ -100,6 +104,61 @@ class PytestPlaywright:
         config.addinivalue_line(
             "markers",
             "browser_context_args(**kwargs): provide additional arguments to browser.new_context()",
+        )
+
+    # Making test result information available in fixtures
+    # https://docs.pytest.org/en/latest/example/simple.html#making-test-result-information-available-in-fixtures
+    @pytest.hookimpl(tryfirst=True, hookwrapper=True)
+    def pytest_runtest_makereport(
+        self, item: pytest.Item
+    ) -> Generator[None, Any, None]:
+        # execute all other hooks to obtain the report object
+        outcome = yield
+        rep = outcome.get_result()
+
+        # set a report attribute for each phase of a call, which can
+        # be "setup", "call", "teardown"
+
+        setattr(item, "rep_" + rep.when, rep)
+
+    @pytest.fixture(scope="session")
+    def _pw_artifacts_folder(
+        self,
+    ) -> Generator[tempfile.TemporaryDirectory, None, None]:
+        artifacts_folder = tempfile.TemporaryDirectory(prefix="playwright-pytest-")
+        yield artifacts_folder
+        try:
+            # On Windows, files can be still in use.
+            # https://github.com/microsoft/playwright-pytest/issues/163
+            artifacts_folder.cleanup()
+        except (PermissionError, NotADirectoryError):
+            pass
+
+    @pytest.fixture(scope="session", autouse=True)
+    def _delete_output_dir(self, pytestconfig: Any) -> None:
+        output_dir = pytestconfig.getoption("--output")
+        if os.path.exists(output_dir):
+            try:
+                shutil.rmtree(output_dir)
+            except (FileNotFoundError, PermissionError):
+                # When running in parallel, another thread may have already deleted the files
+                pass
+            except OSError as error:
+                if error.errno != 16:
+                    raise
+                # We failed to remove folder, might be due to the whole folder being mounted inside a container:
+                #   https://github.com/microsoft/playwright/issues/12106
+                #   https://github.com/microsoft/playwright-python/issues/1781
+                # Do a best-effort to remove all files inside of it instead.
+                entries = os.listdir(output_dir)
+                for entry in entries:
+                    shutil.rmtree(entry)
+
+    @pytest.fixture
+    def output_path(self, pytestconfig: Any, request: pytest.FixtureRequest) -> str:
+        output_dir = Path(pytestconfig.getoption("--output")).absolute()
+        return os.path.join(
+            output_dir, _truncate_file_name(slugify(request.node.nodeid))
         )
 
     @pytest.fixture(scope="session")
@@ -227,7 +286,7 @@ def pytest_addoption(parser: pytest.Parser) -> None:
     )
 
 
-def _get_skiplist(item: Any, values: List[str], value_name: str) -> List[str]:
+def _get_skiplist(item: pytest.Item, values: List[str], value_name: str) -> List[str]:
     skipped_values: List[str] = []
     # Allowlist
     only_marker = item.get_closest_marker(f"only_{value_name}")
@@ -243,7 +302,7 @@ def _get_skiplist(item: Any, values: List[str], value_name: str) -> List[str]:
     return skipped_values
 
 
-def pytest_runtest_setup(item: Any) -> None:
+def pytest_runtest_setup(item: pytest.Item) -> None:
     if not hasattr(item, "callspec"):
         return
     browser_name = item.callspec.params.get("browser_name")

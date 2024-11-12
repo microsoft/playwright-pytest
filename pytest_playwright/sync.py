@@ -49,59 +49,6 @@ from pytest_playwright.pytest_playwright import (
 
 class PytestPlaywrightSync(PytestPlaywright):
     @pytest.fixture(scope="session")
-    def _pw_artifacts_folder(
-        self,
-    ) -> Generator[tempfile.TemporaryDirectory, None, None]:
-        artifacts_folder = tempfile.TemporaryDirectory(prefix="playwright-pytest-")
-        yield artifacts_folder
-        try:
-            # On Windows, files can be still in use.
-            # https://github.com/microsoft/playwright-pytest/issues/163
-            artifacts_folder.cleanup()
-        except (PermissionError, NotADirectoryError):
-            pass
-
-    @pytest.fixture
-    def output_path(self, pytestconfig: Any, request: pytest.FixtureRequest) -> str:
-        output_dir = Path(pytestconfig.getoption("--output")).absolute()
-        return os.path.join(
-            output_dir, _truncate_file_name(slugify(request.node.nodeid))
-        )
-
-    @pytest.fixture(scope="session", autouse=True)
-    def _delete_output_dir(self, pytestconfig: Any) -> None:
-        output_dir = pytestconfig.getoption("--output")
-        if os.path.exists(output_dir):
-            try:
-                shutil.rmtree(output_dir)
-            except (FileNotFoundError, PermissionError):
-                # When running in parallel, another thread may have already deleted the files
-                pass
-            except OSError as error:
-                if error.errno != 16:
-                    raise
-                # We failed to remove folder, might be due to the whole folder being mounted inside a container:
-                #   https://github.com/microsoft/playwright/issues/12106
-                #   https://github.com/microsoft/playwright-python/issues/1781
-                # Do a best-effort to remove all files inside of it instead.
-                entries = os.listdir(output_dir)
-                for entry in entries:
-                    shutil.rmtree(entry)
-
-    # Making test result information available in fixtures
-    # https://docs.pytest.org/en/latest/example/simple.html#making-test-result-information-available-in-fixtures
-    @pytest.hookimpl(tryfirst=True, hookwrapper=True)
-    def pytest_runtest_makereport(self, item: Any) -> Generator[None, Any, None]:
-        # execute all other hooks to obtain the report object
-        outcome = yield
-        rep = outcome.get_result()
-
-        # set a report attribute for each phase of a call, which can
-        # be "setup", "call", "teardown"
-
-        setattr(item, "rep_" + rep.when, rep)
-
-    @pytest.fixture(scope="session")
     def browser_type_launch_args(self, pytestconfig: Any) -> Dict:
         launch_options = {}
         headed_option = pytestconfig.getoption("--headed")
