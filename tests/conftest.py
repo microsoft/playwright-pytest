@@ -29,4 +29,3 @@ elif sys.platform == "win32":
     playwright_browser_path = f"{user_profile}\\AppData\\Local\\ms-playwright"
 
 os.environ["PLAYWRIGHT_BROWSERS_PATH"] = playwright_browser_path
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "tests.assets.django.settings")

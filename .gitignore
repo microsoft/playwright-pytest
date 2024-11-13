@@ -142,6 +142,5 @@ dmypy.json
 # Jetbrains IDEs
 .idea
 
-_repo_version.py
 .DS_Store
 /test-results/
