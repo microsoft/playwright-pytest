@@ -20,6 +20,8 @@ import warnings
 from pathlib import Path
 from typing import (
     Any,
+    AsyncGenerator,
+    Awaitable,
     Callable,
     Dict,
     Generator,
@@ -34,20 +36,21 @@ from typing import (
 )
 
 import pytest
-from playwright.sync_api import (
+from playwright.async_api import (
     Browser,
     BrowserContext,
     BrowserType,
     Error,
     Page,
     Playwright,
-    sync_playwright,
+    async_playwright,
     ProxySettings,
     StorageState,
     HttpCredentials,
     Geolocation,
     ViewportSize,
 )
+import pytest_asyncio
 from slugify import slugify
 import tempfile
 
@@ -214,14 +217,14 @@ def browser_context_args(
     return context_args
 
 
-@pytest.fixture()
-def _artifacts_recorder(
+@pytest_asyncio.fixture(loop_scope="session")
+async def _artifacts_recorder(
     request: pytest.FixtureRequest,
     output_path: str,
     playwright: Playwright,
     pytestconfig: Any,
     _pw_artifacts_folder: tempfile.TemporaryDirectory,
-) -> Generator["ArtifactsRecorder", None, None]:
+) -> AsyncGenerator["ArtifactsRecorder", None]:
     artifacts_recorder = ArtifactsRecorder(
         pytestconfig, request, output_path, playwright, _pw_artifacts_folder
     )
@@ -229,14 +232,14 @@ def _artifacts_recorder(
     # If request.node is missing rep_call, then some error happened during execution
     # that prevented teardown, but should still be counted as a failure
     failed = request.node.rep_call.failed if hasattr(request.node, "rep_call") else True
-    artifacts_recorder.did_finish_test(failed)
+    await artifacts_recorder.did_finish_test(failed)
 
 
-@pytest.fixture(scope="session")
-def playwright() -> Generator[Playwright, None, None]:
-    pw = sync_playwright().start()
+@pytest_asyncio.fixture(scope="session")
+async def playwright() -> AsyncGenerator[Playwright, None]:
+    pw = await async_playwright().start()
     yield pw
-    pw.stop()
+    await pw.stop()
 
 
 @pytest.fixture(scope="session")
@@ -248,20 +251,22 @@ def browser_type(playwright: Playwright, browser_name: str) -> BrowserType:
 def launch_browser(
     browser_type_launch_args: Dict,
     browser_type: BrowserType,
-) -> Callable[..., Browser]:
-    def launch(**kwargs: Dict) -> Browser:
+) -> Callable[..., Awaitable[Browser]]:
+    async def launch(**kwargs: Dict) -> Browser:
         launch_options = {**browser_type_launch_args, **kwargs}
-        browser = browser_type.launch(**launch_options)
+        browser = await browser_type.launch(**launch_options)
         return browser
 
     return launch
 
 
-@pytest.fixture(scope="session")
-def browser(launch_browser: Callable[[], Browser]) -> Generator[Browser, None, None]:
-    browser = launch_browser()
+@pytest_asyncio.fixture(scope="session")
+async def browser(
+    launch_browser: Callable[[], Awaitable[Browser]]
+) -> AsyncGenerator[Browser, None]:
+    browser = await launch_browser()
     yield browser
-    browser.close()
+    await browser.close()
 
 
 class CreateContextCallback(Protocol):
@@ -303,49 +308,49 @@ class CreateContextCallback(Protocol):
         record_har_url_filter: Optional[Union[str, Pattern[str]]] = None,
         record_har_mode: Optional[Literal["full", "minimal"]] = None,
         record_har_content: Optional[Literal["attach", "embed", "omit"]] = None,
-    ) -> BrowserContext: ...
+    ) -> Awaitable[BrowserContext]: ...
 
 
-@pytest.fixture
-def new_context(
+@pytest_asyncio.fixture(loop_scope="session")
+async def new_context(
     browser: Browser,
     browser_context_args: Dict,
     _artifacts_recorder: "ArtifactsRecorder",
     request: pytest.FixtureRequest,
-) -> Generator[CreateContextCallback, None, None]:
+) -> AsyncGenerator[CreateContextCallback, None]:
     browser_context_args = browser_context_args.copy()
     context_args_marker = next(request.node.iter_markers("browser_context_args"), None)
     additional_context_args = context_args_marker.kwargs if context_args_marker else {}
     browser_context_args.update(additional_context_args)
     contexts: List[BrowserContext] = []
 
-    def _new_context(**kwargs: Any) -> BrowserContext:
-        context = browser.new_context(**browser_context_args, **kwargs)
+    async def _new_context(**kwargs: Any) -> BrowserContext:
+        context = await browser.new_context(**browser_context_args, **kwargs)
         original_close = context.close
 
-        def _close_wrapper(*args: Any, **kwargs: Any) -> None:
+        async def _close_wrapper(*args: Any, **kwargs: Any) -> None:
             contexts.remove(context)
-            _artifacts_recorder.on_will_close_browser_context(context)
-            original_close(*args, **kwargs)
+            await _artifacts_recorder.on_will_close_browser_context(context)
+            await original_close(*args, **kwargs)
 
         context.close = _close_wrapper
         contexts.append(context)
-        _artifacts_recorder.on_did_create_browser_context(context)
+        await _artifacts_recorder.on_did_create_browser_context(context)
         return context
 
     yield cast(CreateContextCallback, _new_context)
     for context in contexts.copy():
-        context.close()
+        await context.close()
 
 
-@pytest.fixture
-def context(new_context: CreateContextCallback) -> BrowserContext:
-    return new_context()
+@pytest_asyncio.fixture(loop_scope="session")
+async def context(new_context: CreateContextCallback) -> BrowserContext:
+    return await new_context()
 
 
-@pytest.fixture
-def page(context: BrowserContext) -> Page:
-    return context.new_page()
+@pytest_asyncio.fixture(loop_scope="session")
+async def page(context: BrowserContext) -> Page:
+    return await context.new_page()
 
 
 @pytest.fixture(scope="session")
@@ -479,7 +484,7 @@ class ArtifactsRecorder:
             _truncate_file_name(folder_or_file_name),
         )
 
-    def did_finish_test(self, failed: bool) -> None:
+    async def did_finish_test(self, failed: bool) -> None:
         screenshot_option = self._pytestconfig.getoption("--screenshot")
         capture_screenshot = screenshot_option == "on" or (
             failed and screenshot_option == "only-on-failure"
@@ -525,7 +530,7 @@ class ArtifactsRecorder:
                         if len(self._all_pages) == 1
                         else f"video-{index + 1}.webm"
                     )
-                    video.save_as(
+                    await video.save_as(
                         path=self._build_artifact_test_folder(video_file_name)
                     )
                 except Error:
@@ -536,27 +541,28 @@ class ArtifactsRecorder:
                 # Can be changed to "if page.video" without try/except once https://github.com/microsoft/playwright-python/pull/2410 is released and widely adopted.
                 if video_option in ["on", "retain-on-failure"]:
                     try:
-                        page.video.delete()
+                        if page.video:
+                            await page.video.delete()
                     except Error:
                         pass
 
-    def on_did_create_browser_context(self, context: BrowserContext) -> None:
+    async def on_did_create_browser_context(self, context: BrowserContext) -> None:
         context.on("page", lambda page: self._all_pages.append(page))
         if self._request and self._capture_trace:
-            context.tracing.start(
+            await context.tracing.start(
                 title=slugify(self._request.node.nodeid),
                 screenshots=True,
                 snapshots=True,
                 sources=True,
             )
 
-    def on_will_close_browser_context(self, context: BrowserContext) -> None:
+    async def on_will_close_browser_context(self, context: BrowserContext) -> None:
         if self._capture_trace:
             trace_path = Path(self._pw_artifacts_folder.name) / _create_guid()
-            context.tracing.stop(path=trace_path)
+            await context.tracing.stop(path=trace_path)
             self._traces.append(str(trace_path))
         else:
-            context.tracing.stop()
+            await context.tracing.stop()
 
         if self._pytestconfig.getoption("--screenshot") in ["on", "only-on-failure"]:
             for page in context.pages:
@@ -564,7 +570,7 @@ class ArtifactsRecorder:
                     screenshot_path = (
                         Path(self._pw_artifacts_folder.name) / _create_guid()
                     )
-                    page.screenshot(
+                    await page.screenshot(
                         timeout=5000,
                         path=screenshot_path,
                         full_page=self._pytestconfig.getoption(
