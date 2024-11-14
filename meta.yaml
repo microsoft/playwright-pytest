@@ -36,9 +36,6 @@ test:
     - pip check
   requires:
     - pip
-    {% if package == 'pytest-playwright-asyncio' %}
-    - pytest-asyncio >=0.24.0
-    {% endif %}
 
 about:
   home: https://github.com/microsoft/playwright-pytest
