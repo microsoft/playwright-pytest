@@ -73,5 +73,7 @@ jobs:
           channels: microsoft,conda-forge
       - name: Prepare
         run: conda install conda-build conda-verify
-      - name: Build
+      - name: Build pytest-playwright
         run: conda build .
+      - name: Build pytest-playwright-asyncio
+        run: conda build --variant-config-file conda_build_config_asyncio.yaml .

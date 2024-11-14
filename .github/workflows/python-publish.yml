@@ -25,4 +25,4 @@ jobs:
         run: |
           conda config --set anaconda_upload yes
           conda build --user microsoft pytest-playwright
-          conda build --user microsoft pytest-playwright-asyncio
+          conda build --user microsoft --variant-config-file conda_build_config_asyncio.yaml .
