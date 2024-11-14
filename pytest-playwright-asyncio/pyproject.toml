@@ -3,7 +3,7 @@ requires = ["setuptools==75.4.0", "setuptools_scm==8.1.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "pytest-playwright"
+name = "pytest-playwright-asyncio"
 description = "A pytest wrapper with fixtures for Playwright to automate web browsers"
 readme = "README.md"
 authors = [
@@ -34,8 +34,9 @@ dependencies = [
 homepage = "https://github.com/microsoft/playwright-pytest"
 
 [project.entry-points.pytest11]
-playwright = "pytest_playwright.pytest_playwright"
+playwright-asyncio = "pytest_playwright_asyncio.pytest_playwright"
 
 [tool.setuptools]
-packages = ["pytest_playwright"]
+packages = ["pytest_playwright_asyncio"]
 [tool.setuptools_scm]
+root = ".."

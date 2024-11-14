@@ -24,4 +24,5 @@ jobs:
           ANACONDA_API_TOKEN: ${{ secrets.ANACONDA_API_TOKEN }}
         run: |
           conda config --set anaconda_upload yes
-          conda build --user microsoft .
+          conda build --user microsoft pytest-playwright
+          conda build --user microsoft --variant-config-file conda_build_config_asyncio.yaml .

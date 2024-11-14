@@ -536,7 +536,8 @@ class ArtifactsRecorder:
                 # Can be changed to "if page.video" without try/except once https://github.com/microsoft/playwright-python/pull/2410 is released and widely adopted.
                 if video_option in ["on", "retain-on-failure"]:
                     try:
-                        page.video.delete()
+                        if page.video:
+                            page.video.delete()
                     except Error:
                         pass
 

@@ -3,7 +3,7 @@ channels:
   - conda-forge
 
 package:
-  name: "pytest-playwright"
+  name: "{{ package }}"
   version: "{{ environ.get('GIT_DESCRIBE_TAG') | replace('v', '') }}"
 
 source:
@@ -12,7 +12,7 @@ source:
 build:
   number: 0
   noarch: python
-  script: "{{ PYTHON }} -m pip install . --no-deps -vv"
+  script: python -m pip install --no-deps --ignore-installed ./{{ package }}
 
 requirements:
   host:
@@ -25,14 +25,20 @@ requirements:
     - pytest >=6.2.4,<9.0.0
     - pytest-base-url >=1.0.0,<3.0.0
     - python-slugify >=6.0.0,<9.0.0
+    {% if package == 'pytest-playwright-asyncio' %}
+    - pytest-asyncio >=0.24.0
+    {% endif %}
 
 test:
   imports:
-    - pytest_playwright
+    - "{{ package | replace('-', '_') }}"
   commands:
     - pip check
   requires:
     - pip
+    {% if package == 'pytest-playwright-asyncio' %}
+    - pytest-asyncio >=0.24.0
+    {% endif %}
 
 about:
   home: https://github.com/microsoft/playwright-pytest

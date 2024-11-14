@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools==75.4.0", "setuptools_scm==8.1.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pytest-playwright"
+description = "A pytest wrapper with fixtures for Playwright to automate web browsers"
+readme = "README.md"
+authors = [
+    {name = "Microsoft"}
+]
+license = {file = "LICENSE"}
+requires-python = ">=3.9"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+    "Framework :: Pytest",
+]
+dynamic = ["version"]
+dependencies = [
+    "playwright>=1.18",
+    "pytest>=6.2.4,<9.0.0",
+    "pytest-base-url>=1.0.0,<3.0.0",
+    "python-slugify>=6.0.0,<9.0.0",
+]
+
+[project.urls]
+homepage = "https://github.com/microsoft/playwright-pytest"
+
+[project.entry-points.pytest11]
+playwright = "pytest_playwright.pytest_playwright"
+
+[tool.setuptools]
+packages = ["pytest_playwright"]
+[tool.setuptools_scm]
+root = ".."

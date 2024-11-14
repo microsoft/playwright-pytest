@@ -19,6 +19,17 @@ import sys
 import pytest
 
 
+@pytest.fixture(autouse=True)
+def _add_ini(testdir: pytest.Testdir) -> None:
+    testdir.makefile(
+        ".ini",
+        pytest="""
+        [pytest]
+        addopts = -p no:playwright-asyncio
+    """,
+    )
+
+
 def test_default(testdir: pytest.Testdir) -> None:
     testdir.makepyfile(
         """
@@ -441,6 +452,7 @@ def test_invalid_browser_name(testdir: pytest.Testdir) -> None:
 def test_django(testdir: pytest.Testdir) -> None:
     # Workaround for https://github.com/pytest-dev/pytest/issues/10651
     os.environ.setdefault("PYTHONPATH", str(Path(__file__).parent.parent))
+    os.environ.setdefault("DJANGO_SETTINGS_MODULE", "tests.assets.django.settings")
     testdir.makepyfile(
         """
     from django.test import TestCase
