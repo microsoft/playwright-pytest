@@ -1,4 +1,4 @@
-# Pytest plugin for Playwright [![PyPI](https://img.shields.io/pypi/v/pytest-playwright)](https://pypi.org/project/pytest-playwright/)
+# Pytest plugin for Playwright [![PyPI](https://img.shields.io/pypi/v/pytest-playwright-asyncio)](https://pypi.org/project/pytest-playwright-asyncio/)
 
 Write end-to-end tests for your web apps with [Playwright](https://github.com/microsoft/playwright-python) and [pytest](https://docs.pytest.org/en/stable/).
 
