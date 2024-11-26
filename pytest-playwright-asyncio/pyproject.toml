@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pytest-playwright-asyncio"
-description = "A pytest wrapper with fixtures for Playwright to automate web browsers"
+description = "A pytest wrapper with async fixtures for Playwright to automate web browsers"
 readme = "README.md"
 authors = [
     {name = "Microsoft"}

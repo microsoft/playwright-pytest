@@ -39,6 +39,6 @@ test:
 
 about:
   home: https://github.com/microsoft/playwright-pytest
-  summary: A pytest wrapper with fixtures for Playwright to automate web browsers
+  summary: A pytest wrapper with {% if package == 'pytest-playwright-asyncio' %} async{% endif %}fixtures for Playwright to automate web browsers
   license: Apache-2.0
   license_file: LICENSE
