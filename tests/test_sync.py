@@ -14,6 +14,8 @@
 
 import os
 from pathlib import Path
+import signal
+import subprocess
 import sys
 
 import pytest
@@ -982,3 +984,43 @@ def test_with_page(page):
             "test-results/test-output-path-via-pytest-runtest-makereport-hook-py-test-with-page-chromium"
         ).strpath,
     ]
+
+
+def test_connect_options_should_work(testdir: pytest.Testdir) -> None:
+    server_process = None
+    try:
+        testdir.makeconftest(
+            """
+            import pytest
+
+            @pytest.fixture(scope="session")
+            def connect_options():
+                return {
+                    "ws_endpoint": "ws://localhost:1234",
+                }
+            """
+        )
+        testdir.makepyfile(
+            """
+            def test_connect_options(page):
+                assert page.evaluate("1 + 1") == 2
+            """
+        )
+        result = testdir.runpytest()
+        assert "connect ECONNREFUSED" in "".join(result.outlines)
+        server_process = subprocess.Popen(
+            ["playwright", "run-server", "--port=1234"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        while True:
+            stdout = server_process.stdout
+            assert stdout
+            if "Listening on" in str(stdout.readline()):
+                break
+        result = testdir.runpytest()
+        result.assert_outcomes(passed=1)
+    finally:
+        assert server_process
+        os.kill(server_process.pid, signal.SIGINT)
+        server_process.wait()
