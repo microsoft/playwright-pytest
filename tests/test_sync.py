@@ -1011,7 +1011,6 @@ def test_connect_options_should_work(testdir: pytest.Testdir) -> None:
         server_process = subprocess.Popen(
             ["playwright", "run-server", "--port=1234"],
             stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
         )
         while True:
             stdout = server_process.stdout
@@ -1022,5 +1021,10 @@ def test_connect_options_should_work(testdir: pytest.Testdir) -> None:
         result.assert_outcomes(passed=1)
     finally:
         assert server_process
-        os.kill(server_process.pid, signal.SIGINT)
+        # TODO: Playwright CLI on Windows via Python does not forward the signal
+        # hence we need to send it to the whole process group.
+        if sys.platform == "win32":
+            subprocess.run(["taskkill", "/F", "/T", "/PID", str(server_process.pid)])
+        else:
+            os.kill(server_process.pid, signal.SIGINT)
         server_process.wait()
