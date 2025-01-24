@@ -72,7 +72,10 @@ jobs:
           python-version: 3.9
           channels: microsoft,conda-forge
       - name: Prepare
-        run: conda install conda-build conda-verify
+        run: |
+          conda install conda-build conda-verify
+          # Until https://github.com/anaconda/conda-anaconda-telemetry/issues/87 has been fixed
+          conda remove --name base conda-anaconda-telemetry
       - name: Build pytest-playwright
         run: conda build .
       - name: Build pytest-playwright-asyncio
