@@ -19,7 +19,7 @@ jobs:
           channels: microsoft,conda-forge
       - name: Prepare
         run: |
-          conda install conda-build conda-verify
+          conda install anaconda-client conda-build conda-verify
           # Until https://github.com/anaconda/conda-anaconda-telemetry/issues/87 has been fixed
           conda remove --name base conda-anaconda-telemetry
       - name: Build and Upload
