@@ -18,7 +18,10 @@ jobs:
           python-version: 3.9
           channels: microsoft,conda-forge
       - name: Prepare
-        run: conda install anaconda-client conda-build conda-verify
+        run: |
+          conda install anaconda-client conda-build conda-verify
+          # Until https://github.com/anaconda/conda-anaconda-telemetry/issues/87 has been fixed
+          conda remove --name base conda-anaconda-telemetry
       - name: Build and Upload
         env:
           ANACONDA_API_TOKEN: ${{ secrets.ANACONDA_API_TOKEN }}

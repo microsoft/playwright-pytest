@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import hashlib
+import json
 import shutil
 import os
 import sys
@@ -248,13 +249,32 @@ def browser_type(playwright: Playwright, browser_name: str) -> BrowserType:
 
 
 @pytest.fixture(scope="session")
+def connect_options() -> Optional[Dict]:
+    return None
+
+
+@pytest.fixture(scope="session")
 def launch_browser(
     browser_type_launch_args: Dict,
     browser_type: BrowserType,
+    connect_options: Optional[Dict],
 ) -> Callable[..., Awaitable[Browser]]:
     async def launch(**kwargs: Dict) -> Browser:
         launch_options = {**browser_type_launch_args, **kwargs}
-        browser = await browser_type.launch(**launch_options)
+        if connect_options:
+            browser = await browser_type.connect(
+                **(
+                    {
+                        **connect_options,
+                        "headers": {
+                            "x-playwright-launch-options": json.dumps(launch_options),
+                            **(connect_options.get("headers") or {}),
+                        },
+                    }
+                )
+            )
+        else:
+            browser = await browser_type.launch(**launch_options)
         return browser
 
     return launch
