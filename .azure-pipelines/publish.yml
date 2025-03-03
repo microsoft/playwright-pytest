@@ -27,7 +27,12 @@ extends:
     stages:
     - stage: Stage
       jobs:
-      - job: HostJob
+      - job: Build
+        templateContext:
+          outputs:
+          - output: pipelineArtifact
+            path: $(Build.ArtifactStagingDirectory)/esrp-build
+            artifact: esrp-build
         steps:
         - task: UsePythonVersion@0
           inputs:
@@ -36,9 +41,20 @@ extends:
         - script: |
             python -m pip install --upgrade pip
             pip install -r local-requirements.txt
-            python -m build --outdir=dist pytest-playwright
-            python -m build --outdir=dist pytest-playwright-asyncio
+            python -m build --outdir $(Build.ArtifactStagingDirectory)/esrp-build pytest-playwright
+            python -m build --outdir $(Build.ArtifactStagingDirectory)/esrp-build pytest-playwright-asyncio
           displayName: 'Install & Build'
+    - job: Publish
+      dependsOn: Build
+      templateContext:
+        type: releaseJob
+        isProduction: true
+        inputs:
+        - input: pipelineArtifact
+          artifactName: esrp-build
+          targetPath: $(Build.ArtifactStagingDirectory)/esrp-build
+      steps:
+        - checkout: none
         - task: EsrpRelease@9
           inputs:
             connectedservicename: 'Playwright-ESRP-PME'
@@ -51,7 +67,7 @@ extends:
             # Keeping it commented out as a workaround for:
             # https://portal.microsofticm.com/imp/v3/incidents/incident/499972482/summary
             # contentsource: 'folder'
-            folderlocation: './dist/'
+            folderlocation: '$(Build.ArtifactStagingDirectory)/esrp-build'
             waitforreleasecompletion: true
             owners: 'maxschmitt@microsoft.com'
             approvers: 'maxschmitt@microsoft.com'
