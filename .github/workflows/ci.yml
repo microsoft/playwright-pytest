@@ -45,9 +45,9 @@ jobs:
         pip install -r local-requirements.txt
         pip install -e pytest-playwright
         pip install -e pytest-playwright-asyncio
-        python -m playwright install --with-deps
+        playwright install --with-deps
         if [ '${{ matrix.os }}' == 'macos-latest' ]; then
-          python -m playwright install msedge --with-deps
+          playwright install msedge --with-deps
         fi
     - name: Test
       if: ${{ matrix.os != 'ubuntu-latest' }}
