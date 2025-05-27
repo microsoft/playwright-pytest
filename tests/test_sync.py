@@ -21,6 +21,15 @@ import sys
 import pytest
 
 
+@pytest.fixture
+def pytester(pytester: pytest.Pytester) -> pytest.Pytester:
+    # Pytester internally in their constructor overrides the HOME and USERPROFILE env variables. This confuses Chromium hence we unset them.
+    # See https://github.com/pytest-dev/pytest/blob/83536b4b0074ca35d90933d3ad46cb6efe7f5145/src/_pytest/pytester.py#L704-L705
+    os.environ.pop("HOME", None)
+    os.environ.pop("USERPROFILE", None)
+    return pytester
+
+
 @pytest.fixture(autouse=True)
 def _add_ini(testdir: pytest.Testdir) -> None:
     testdir.makefile(
