@@ -66,6 +66,14 @@ def _pw_artifacts_folder() -> Generator[tempfile.TemporaryDirectory, None, None]
 
 
 @pytest.fixture(scope="session", autouse=True)
+def _check_sync_async_incompatibility(pytestconfig: Any) -> None:
+    if pytestconfig.pluginmanager.hasplugin("pytest-playwright-asyncio"):
+        raise RuntimeError(
+            "pytest-playwright and pytest-playwright-asyncio are not compatible. Please use only one of them."
+        )
+
+
+@pytest.fixture(scope="session", autouse=True)
 def delete_output_dir(pytestconfig: Any) -> None:
     output_dir = pytestconfig.getoption("--output")
     if os.path.exists(output_dir):
