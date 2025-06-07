@@ -69,6 +69,14 @@ def _pw_artifacts_folder() -> Generator[tempfile.TemporaryDirectory, None, None]
 
 
 @pytest.fixture(scope="session", autouse=True)
+def _check_sync_async_incompatibility(pytestconfig: Any) -> None:
+    if pytestconfig.pluginmanager.hasplugin("pytest-playwright"):
+        raise RuntimeError(
+            "pytest-playwright and pytest-playwright-asyncio are not compatible. Please use only one of them."
+        )
+
+
+@pytest.fixture(scope="session", autouse=True)
 def delete_output_dir(pytestconfig: Any) -> None:
     output_dir = pytestconfig.getoption("--output")
     if os.path.exists(output_dir):
@@ -282,7 +290,7 @@ def launch_browser(
 
 @pytest_asyncio.fixture(scope="session")
 async def browser(
-    launch_browser: Callable[[], Awaitable[Browser]]
+    launch_browser: Callable[[], Awaitable[Browser]],
 ) -> AsyncGenerator[Browser, None]:
     browser = await launch_browser()
     yield browser

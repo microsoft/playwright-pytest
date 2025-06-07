@@ -31,13 +31,41 @@ def pytester(pytester: pytest.Pytester) -> pytest.Pytester:
 
 
 @pytest.fixture(autouse=True)
-def _add_ini(testdir: pytest.Testdir) -> None:
+def _add_ini(request: pytest.FixtureRequest, testdir: pytest.Testdir) -> None:
+    if "no_add_ini" in request.keywords:
+        return
     testdir.makefile(
         ".ini",
         pytest="""
         [pytest]
         addopts = -p no:playwright-asyncio
     """,
+    )
+
+
+@pytest.mark.no_add_ini
+def test_sync_async_incompatibility(testdir: pytest.Testdir) -> None:
+    # Remove `-p no:playwright-asyncio` from pytest addopts
+    testdir.makefile(
+        ".ini",
+        pytest="""
+        [pytest]
+        addopts = --maxfail=1
+    """,
+    )
+    testdir.makepyfile(
+        """
+        import pytest
+
+        def test_foo():
+            pass
+    """
+    )
+    result = testdir.runpytest()
+    result.assert_outcomes(passed=0, errors=1)
+    assert (
+        "pytest-playwright and pytest-playwright-asyncio are not compatible. Please use only one of them."
+        in "\n".join(result.outlines)
     )
 
 
