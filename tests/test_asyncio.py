@@ -810,7 +810,7 @@ def test_is_able_to_set_expect_timeout_via_conftest(testdir: pytest.Testdir) -> 
     result = testdir.runpytest()
     result.assert_outcomes(passed=0, failed=1, skipped=0)
     result.stdout.fnmatch_lines("*AssertionError: Locator expected to be visible*")
-    result.stdout.fnmatch_lines("*LocatorAssertions.to_be_visible with timeout 1111ms*")
+    result.stdout.fnmatch_lines('*Expect "to_be_visible" with timeout 1111ms*')
 
 
 def test_artifact_collection_should_work_for_manually_created_contexts_keep_open(
