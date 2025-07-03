@@ -92,7 +92,7 @@ def delete_output_dir(pytestconfig: Any) -> None:
 def pytest_generate_tests(metafunc: Any) -> None:
     if "browser_name" in metafunc.fixturenames:
         browsers = metafunc.config.option.browser or ["chromium"]
-        metafunc.parametrize("browser_name", browsers, scope="session")
+        metafunc.parametrize("browser_name", browsers, scope="session", indirect=True)
 
 
 def pytest_configure(config: Any) -> None:
@@ -389,7 +389,10 @@ def is_chromium(browser_name: str) -> bool:
 
 
 @pytest.fixture(scope="session")
-def browser_name(pytestconfig: Any) -> Optional[str]:
+def browser_name(pytestconfig: Any, request: pytest.FixtureRequest) -> Optional[str]:
+    if hasattr(request, "param"):
+        return request.param
+
     # When using unittest.TestCase it won't use pytest_generate_tests
     # For that we still try to give the user a slightly less feature-rich experience
     browser_names = pytestconfig.getoption("--browser")
