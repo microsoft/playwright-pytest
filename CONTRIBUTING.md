@@ -298,6 +298,11 @@ The plugins provide several browser-related fixtures:
 
 4. **Check browser screenshots** (saved in test-results directory)
 
+5. **Enable test artifacts for debugging**
+   ```bash
+   pytest --screenshot=on --video=on --tracing=on  # Generate debugging artifacts
+   ```
+
 ## Troubleshooting
 
 ### Common Issues

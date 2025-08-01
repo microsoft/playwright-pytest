@@ -32,6 +32,7 @@ pytest                           # Run all tests
 pytest tests/test_sync.py        # Sync plugin tests
 pytest tests/test_asyncio.py     # Async plugin tests
 pytest -k "test_name"            # Specific test
+pytest --cov=pytest_playwright --cov-report xml  # With coverage
 xvfb-run pytest                 # Linux headless
 
 # Code Quality
