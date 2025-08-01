@@ -30,7 +30,9 @@ def pytester(pytester: pytest.Pytester) -> pytest.Pytester:
 
 
 @pytest.fixture(autouse=True)
-def _add_async_marker(testdir: pytest.Testdir) -> None:
+def _add_ini_asyncio(request: pytest.FixtureRequest, testdir: pytest.Testdir) -> None:
+    if "no_add_ini" in request.keywords:
+        return
     testdir.makefile(
         ".ini",
         pytest="""
@@ -39,6 +41,44 @@ def _add_async_marker(testdir: pytest.Testdir) -> None:
         asyncio_default_test_loop_scope = session
         asyncio_default_fixture_loop_scope = session
     """,
+    )
+
+
+@pytest.mark.no_add_ini
+def test_sync_async_incompatibility(testdir: pytest.Testdir) -> None:
+    # This test needs to load both playwright and playwright-asyncio plugins
+    # to trigger the incompatibility check
+    testdir.makefile(
+        ".ini",
+        pytest="""
+        [pytest]
+        addopts = --maxfail=1
+        asyncio_default_test_loop_scope = session
+        asyncio_default_fixture_loop_scope = session
+    """,
+    )
+    testdir.makepyfile(
+        """
+        import pytest
+        @pytest.mark.asyncio
+        async def test_foo():
+            pass
+    """
+    )
+    # Explicitly load both plugins to trigger the incompatibility
+    result = testdir.runpytest(
+        "-p",
+        "pytest_playwright.pytest_playwright",
+        "-p",
+        "pytest_playwright_asyncio.pytest_playwright",
+    )
+    # When a plugin fails to load, pytest exits with a non-zero code
+    assert result.ret != 0
+    # Check both stdout and stderr for the error message
+    output = "\n".join(result.outlines + result.errlines)
+    assert (
+        "pytest-playwright and pytest-playwright-asyncio are not compatible. Please use only one of them."
+        in output
     )
 
 
@@ -235,7 +275,7 @@ def test_firefox(testdir: pytest.Testdir) -> None:
             assert is_chromium is False
             assert is_firefox
             assert is_webkit is False
-    """
+        """
     )
     result = testdir.runpytest("--browser", "firefox")
     result.assert_outcomes(passed=1)
@@ -810,7 +850,7 @@ def test_is_able_to_set_expect_timeout_via_conftest(testdir: pytest.Testdir) -> 
     result = testdir.runpytest()
     result.assert_outcomes(passed=0, failed=1, skipped=0)
     result.stdout.fnmatch_lines("*AssertionError: Locator expected to be visible*")
-    result.stdout.fnmatch_lines("*LocatorAssertions.to_be_visible with timeout 1111ms*")
+    result.stdout.fnmatch_lines('*Expect "to_be_visible" with timeout 1111ms*')
 
 
 def test_artifact_collection_should_work_for_manually_created_contexts_keep_open(

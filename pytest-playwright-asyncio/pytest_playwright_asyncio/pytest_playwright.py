@@ -37,6 +37,8 @@ from typing import (
 )
 
 import pytest
+from _pytest.config.argparsing import Parser
+from _pytest.config import PytestPluginManager
 from playwright.async_api import (
     Browser,
     BrowserContext,
@@ -282,7 +284,7 @@ def launch_browser(
 
 @pytest_asyncio.fixture(scope="session")
 async def browser(
-    launch_browser: Callable[[], Awaitable[Browser]]
+    launch_browser: Callable[[], Awaitable[Browser]],
 ) -> AsyncGenerator[Browser, None]:
     browser = await launch_browser()
     yield browser
@@ -413,68 +415,80 @@ def device(pytestconfig: Any) -> Optional[str]:
     return pytestconfig.getoption("--device")
 
 
-def pytest_addoption(parser: Any) -> None:
+def pytest_addoption(parser: Parser, pluginmanager: PytestPluginManager) -> None:
+    # Check for incompatible sync plugin early
+    if pluginmanager.hasplugin("playwright"):
+        raise RuntimeError(
+            "pytest-playwright and pytest-playwright-asyncio are not compatible. Please use only one of them."
+        )
     group = parser.getgroup("playwright", "Playwright")
-    group.addoption(
-        "--browser",
-        action="append",
-        default=[],
-        help="Browser engine which should be used",
-        choices=["chromium", "firefox", "webkit"],
-    )
-    group.addoption(
-        "--headed",
-        action="store_true",
-        default=False,
-        help="Run tests in headed mode.",
-    )
-    group.addoption(
-        "--browser-channel",
-        action="store",
-        default=None,
-        help="Browser channel to be used.",
-    )
-    group.addoption(
-        "--slowmo",
-        default=0,
-        type=int,
-        help="Run tests with slow mo",
-    )
-    group.addoption(
-        "--device",
-        default=None,
-        action="store",
-        help="Device to be emulated.",
-    )
-    group.addoption(
-        "--output",
-        default="test-results",
-        help="Directory for artifacts produced by tests, defaults to test-results.",
-    )
-    group.addoption(
-        "--tracing",
-        default="off",
-        choices=["on", "off", "retain-on-failure"],
-        help="Whether to record a trace for each test.",
-    )
-    group.addoption(
-        "--video",
-        default="off",
-        choices=["on", "off", "retain-on-failure"],
-        help="Whether to record video for each test.",
-    )
-    group.addoption(
-        "--screenshot",
-        default="off",
-        choices=["on", "off", "only-on-failure"],
-        help="Whether to automatically capture a screenshot after each test.",
-    )
-    group.addoption(
-        "--full-page-screenshot",
-        action="store_true",
-        default=False,
-        help="Whether to take a full page screenshot",
-    )
+    try:
+        group.addoption(
+            "--browser",
+            action="append",
+            default=[],
+            help="Browser engine which should be used",
+            choices=["chromium", "firefox", "webkit"],
+        )
+        group.addoption(
+            "--headed",
+            action="store_true",
+            default=False,
+            help="Run tests in headed mode.",
+        )
+        group.addoption(
+            "--browser-channel",
+            action="store",
+            default=None,
+            help="Browser channel to be used.",
+        )
+        group.addoption(
+            "--slowmo",
+            default=0,
+            type=int,
+            help="Run tests with slow mo",
+        )
+        group.addoption(
+            "--device",
+            default=None,
+            action="store",
+            help="Device to be emulated.",
+        )
+        group.addoption(
+            "--output",
+            default="test-results",
+            help="Directory for artifacts produced by tests, defaults to test-results.",
+        )
+        group.addoption(
+            "--tracing",
+            default="off",
+            choices=["on", "off", "retain-on-failure"],
+            help="Whether to record a trace for each test.",
+        )
+        group.addoption(
+            "--video",
+            default="off",
+            choices=["on", "off", "retain-on-failure"],
+            help="Whether to record video for each test.",
+        )
+        group.addoption(
+            "--screenshot",
+            default="off",
+            choices=["on", "off", "only-on-failure"],
+            help="Whether to automatically capture a screenshot after each test.",
+        )
+        group.addoption(
+            "--full-page-screenshot",
+            action="store_true",
+            default=False,
+            help="Whether to take a full page screenshot",
+        )
+    except ValueError as e:
+        if "option names" in str(e) and "already added" in str(e):
+            raise RuntimeError(
+                "pytest-playwright and pytest-playwright-asyncio are not compatible. Please use only one of them."
+            ) from e
+        raise
 
 
 class ArtifactsRecorder:
