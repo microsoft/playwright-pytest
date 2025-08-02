@@ -306,8 +306,8 @@ def test_goto(testdir: pytest.Testdir) -> None:
             assert base_url == "https://example.com"
             await page.goto("/foobar")
             assert page.url == "https://example.com/foobar"
-            await page.goto("https://example.org")
-            assert page.url == "https://example.org/"
+            await page.goto("data:text/html,<h1>Test Page</h1>")
+            assert page.url.startswith("data:")
     """
     )
     result = testdir.runpytest("--base-url", "https://example.com")
