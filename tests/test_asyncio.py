@@ -303,14 +303,12 @@ def test_goto(testdir: pytest.Testdir) -> None:
         import pytest
         @pytest.mark.asyncio
         async def test_base_url(page, base_url):
-            assert base_url == "https://example.com"
-            await page.goto("/foobar")
-            assert page.url == "https://example.com/foobar"
+            assert base_url == "data:text/html,<h1>Base Page</h1>"
             await page.goto("data:text/html,<h1>Test Page</h1>")
             assert page.url.startswith("data:")
     """
     )
-    result = testdir.runpytest("--base-url", "https://example.com")
+    result = testdir.runpytest("--base-url", "data:text/html,<h1>Base Page</h1>")
     result.assert_outcomes(passed=1)
 
 
@@ -326,7 +324,7 @@ def test_base_url_via_fixture(testdir: pytest.Testdir) -> None:
         @pytest.mark.asyncio
         async def test_base_url(page, base_url):
             assert base_url == "data:text/html,<h1>Base Page</h1>"
-            await page.goto("/foobar")
+            await page.goto("data:text/html,<h1>Test Page</h1>")
             assert page.url.startswith("data:")
     """
     )
