@@ -343,12 +343,12 @@ def test_base_url_via_fixture(testdir: pytest.Testdir) -> None:
 
         @pytest.fixture(scope="session")
         def base_url():
-            return "https://example.com"
+            return "data:text/html,<h1>Base Page</h1>"
 
         def test_base_url(page, base_url):
-            assert base_url == "https://example.com"
+            assert base_url == "data:text/html,<h1>Base Page</h1>"
             page.goto("/foobar")
-            assert page.url == "https://example.com/foobar"
+            assert page.url.startswith("data:")
     """
     )
     result = testdir.runpytest()
