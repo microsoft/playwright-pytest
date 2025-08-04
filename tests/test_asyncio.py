@@ -19,6 +19,8 @@ import sys
 
 import pytest
 
+from tests.conftest import HTTPTestServer
+
 
 @pytest.fixture
 def pytester(pytester: pytest.Pytester) -> pytest.Pytester:
@@ -295,35 +297,39 @@ def test_webkit(testdir: pytest.Testdir) -> None:
     result.assert_outcomes(passed=1)
 
 
-def test_goto(testdir: pytest.Testdir) -> None:
+def test_goto(testdir: pytest.Testdir, test_server: HTTPTestServer) -> None:
     testdir.makepyfile(
-        """
+        f"""
         import pytest
         @pytest.mark.asyncio
         async def test_base_url(page, base_url):
-            assert base_url == "data:text/html,<h1>Base Page</h1>"
-            await page.goto("data:text/html,<h1>Test Page</h1>")
-            assert page.url.startswith("data:")
+            assert base_url == "{test_server.PREFIX}"
+            await page.goto("/foobar")
+            assert page.url == "{test_server.PREFIX}/foobar"
+            await page.goto("{test_server.CROSS_PROCESS_PREFIX}")
+            assert page.url == "{test_server.CROSS_PROCESS_PREFIX}/"
     """
     )
-    result = testdir.runpytest("--base-url", "data:text/html,<h1>Base Page</h1>")
+    result = testdir.runpytest("--base-url", test_server.PREFIX)
     result.assert_outcomes(passed=1)
 
 
-def test_base_url_via_fixture(testdir: pytest.Testdir) -> None:
+def test_base_url_via_fixture(
+    testdir: pytest.Testdir, test_server: HTTPTestServer
+) -> None:
     testdir.makepyfile(
-        """
+        f"""
         import pytest
 
         @pytest.fixture(scope="session")
         def base_url():
-            return "data:text/html,<h1>Base Page</h1>"
+            return "{test_server.PREFIX}"
 
         @pytest.mark.asyncio
         async def test_base_url(page, base_url):
-            assert base_url == "data:text/html,<h1>Base Page</h1>"
-            await page.goto("data:text/html,<h1>Test Page</h1>")
-            assert page.url.startswith("data:")
+            assert base_url == "{test_server.PREFIX}"
+            await page.goto("/foobar")
+            assert page.url == "{test_server.PREFIX}/foobar"
     """
     )
     result = testdir.runpytest()
