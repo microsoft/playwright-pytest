@@ -72,9 +72,7 @@ def test_sync_async_incompatibility(testdir: pytest.Testdir) -> None:
         "-p",
         "pytest_playwright_asyncio.pytest_playwright",
     )
-    # When a plugin fails to load, pytest exits with a non-zero code
     assert result.ret != 0
-    # Check both stdout and stderr for the error message
     output = "\n".join(result.outlines + result.errlines)
     assert (
         "pytest-playwright and pytest-playwright-asyncio are not compatible. Please use only one of them."
