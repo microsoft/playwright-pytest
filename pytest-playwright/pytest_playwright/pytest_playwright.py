@@ -408,7 +408,14 @@ def device(pytestconfig: Any) -> Optional[str]:
     return pytestconfig.getoption("--device")
 
 
-def pytest_addoption(parser: Any) -> None:
+def pytest_addoption(
+    parser: pytest.Parser, pluginmanager: pytest.PytestPluginManager
+) -> None:
+    # Check for incompatible async plugin early
+    if pluginmanager.has_plugin("pytest_playwright_asyncio.pytest_playwright"):
+        raise RuntimeError(
+            "pytest-playwright and pytest-playwright-asyncio are not compatible. Please use only one of them."
+        )
     group = parser.getgroup("playwright", "Playwright")
     group.addoption(
         "--browser",

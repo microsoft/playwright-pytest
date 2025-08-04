@@ -32,7 +32,9 @@ def pytester(pytester: pytest.Pytester) -> pytest.Pytester:
 
 
 @pytest.fixture(autouse=True)
-def _add_async_marker(testdir: pytest.Testdir) -> None:
+def _add_ini_asyncio(request: pytest.FixtureRequest, testdir: pytest.Testdir) -> None:
+    if "no_add_ini" in request.keywords:
+        return
     testdir.makefile(
         ".ini",
         pytest="""
@@ -41,6 +43,42 @@ def _add_async_marker(testdir: pytest.Testdir) -> None:
         asyncio_default_test_loop_scope = session
         asyncio_default_fixture_loop_scope = session
     """,
+    )
+
+
+@pytest.mark.no_add_ini
+def test_sync_async_incompatibility(testdir: pytest.Testdir) -> None:
+    # This test needs to load both playwright and playwright-asyncio plugins
+    # to trigger the incompatibility check
+    testdir.makefile(
+        ".ini",
+        pytest="""
+        [pytest]
+        addopts = --maxfail=1
+        asyncio_default_test_loop_scope = session
+        asyncio_default_fixture_loop_scope = session
+    """,
+    )
+    testdir.makepyfile(
+        """
+        import pytest
+        @pytest.mark.asyncio
+        async def test_foo():
+            pass
+    """
+    )
+    # Explicitly load both plugins to trigger the incompatibility
+    result = testdir.runpytest(
+        "-p",
+        "pytest_playwright.pytest_playwright",
+        "-p",
+        "pytest_playwright_asyncio.pytest_playwright",
+    )
+    assert result.ret != 0
+    output = "\n".join(result.outlines + result.errlines)
+    assert (
+        "pytest-playwright and pytest-playwright-asyncio are not compatible. Please use only one of them."
+        in output
     )
 
 
@@ -237,7 +275,7 @@ def test_firefox(testdir: pytest.Testdir) -> None:
             assert is_chromium is False
             assert is_firefox
             assert is_webkit is False
-    """
+        """
     )
     result = testdir.runpytest("--browser", "firefox")
     result.assert_outcomes(passed=1)

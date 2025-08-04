@@ -33,13 +33,49 @@ def pytester(pytester: pytest.Pytester) -> pytest.Pytester:
 
 
 @pytest.fixture(autouse=True)
-def _add_ini(testdir: pytest.Testdir) -> None:
+def _add_ini(request: pytest.FixtureRequest, testdir: pytest.Testdir) -> None:
+    if "no_add_ini" in request.keywords:
+        return
     testdir.makefile(
         ".ini",
         pytest="""
         [pytest]
         addopts = -p no:playwright-asyncio
     """,
+    )
+
+
+@pytest.mark.no_add_ini
+def test_sync_async_incompatibility(testdir: pytest.Testdir) -> None:
+    # This test needs to load both playwright and playwright-asyncio plugins
+    # to trigger the incompatibility check
+    testdir.makefile(
+        ".ini",
+        pytest="""
+        [pytest]
+        addopts = --maxfail=1
+    """,
+    )
+    testdir.makepyfile(
+        """
+        import pytest
+
+        def test_foo():
+            pass
+    """
+    )
+    # Explicitly load both plugins to trigger the incompatibility
+    result = testdir.runpytest(
+        "-p",
+        "pytest_playwright.pytest_playwright",
+        "-p",
+        "pytest_playwright_asyncio.pytest_playwright",
+    )
+    assert result.ret != 0
+    output = "\n".join(result.outlines + result.errlines)
+    assert (
+        "pytest-playwright and pytest-playwright-asyncio are not compatible. Please use only one of them."
+        in output
     )
 
 

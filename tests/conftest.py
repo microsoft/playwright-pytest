@@ -15,13 +15,18 @@
 import sys
 import os
 import socket
-from typing import Generator, Optional, Type
+from typing import Any, Generator, Optional, Type
 import pytest
 import threading
 import http.server
 import socketserver
 
 pytest_plugins = ["pytester"]
+
+
+def pytest_configure(config: Any) -> None:
+    config.addinivalue_line("markers", "no_add_ini: mark test to skip adding ini file")
+
 
 # The testdir fixture which we use to perform unit tests will set the home directory
 # To a temporary directory of the created test. This would result that the browsers will
