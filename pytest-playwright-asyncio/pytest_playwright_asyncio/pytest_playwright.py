@@ -600,6 +600,7 @@ class ArtifactsRecorder:
                     await page.screenshot(
                         timeout=5000,
                         path=screenshot_path,
+                        type="png",
                         full_page=self._pytestconfig.getoption(
                             "--full-page-screenshot"
                         ),
