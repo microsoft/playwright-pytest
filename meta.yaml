@@ -16,11 +16,11 @@ build:
 
 requirements:
   host:
-    - python >=3.9
+    - python >=3.10
     - setuptools-scm
     - pip
   run:
-    - python >=3.9
+    - python >=3.10
     - microsoft::playwright >=1.37.0
     - pytest >=6.2.4,<9.0.0
     - pytest-base-url >=1.0.0,<3.0.0
