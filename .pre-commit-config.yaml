@@ -2,7 +2,7 @@
 # See https://pre-commit.com/hooks.html for more hooks
 repos:
 -   repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v5.0.0
+    rev: v6.0.0
     hooks:
     -   id: trailing-whitespace
     -   id: end-of-file-fixer
@@ -10,15 +10,15 @@ repos:
         exclude: meta.yaml
     -   id: check-added-large-files
 -   repo: https://github.com/psf/black
-    rev: 24.10.0
+    rev: 25.11.0
     hooks:
     -   id: black
 -   repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.13.0
+    rev: v1.18.2
     hooks:
     -   id: mypy
-        additional_dependencies: [types-python-slugify==6.1.0]
+        additional_dependencies: [types-python-slugify==8.0.2.20240310]
 -   repo: https://github.com/pycqa/flake8
-    rev: 7.1.1
+    rev: 7.3.0
     hooks:
       - id: flake8
