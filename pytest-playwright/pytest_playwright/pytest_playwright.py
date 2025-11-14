@@ -408,14 +408,24 @@ def device(pytestconfig: Any) -> Optional[str]:
     return pytestconfig.getoption("--device")
 
 
+PW_ASYNC_CANONICAL_NAME = "pytest_playwright_asyncio.pytest_playwright"
+PLUGIN_INCOMPATIBLE_MESSAGE = "pytest-playwright and pytest-playwright-asyncio are not compatible. Please use only one of them."
+
+
 def pytest_addoption(
     parser: pytest.Parser, pluginmanager: pytest.PytestPluginManager
 ) -> None:
-    # Check for incompatible async plugin early
-    if pluginmanager.has_plugin("pytest_playwright_asyncio.pytest_playwright"):
-        raise RuntimeError(
-            "pytest-playwright and pytest-playwright-asyncio are not compatible. Please use only one of them."
-        )
+    # Check for incompatible async plugin with canonical name
+    if pluginmanager.has_plugin(PW_ASYNC_CANONICAL_NAME):
+        raise RuntimeError(PLUGIN_INCOMPATIBLE_MESSAGE)
+    # Check for incompatible async plugin with common name
+    common_name_plugin = pluginmanager.get_plugin("playwright-asyncio")
+    if (
+        common_name_plugin is not None
+        and pluginmanager.get_canonical_name(common_name_plugin)
+        == PW_ASYNC_CANONICAL_NAME
+    ):
+        raise RuntimeError(PLUGIN_INCOMPATIBLE_MESSAGE)
     group = parser.getgroup("playwright", "Playwright")
     group.addoption(
         "--browser",
