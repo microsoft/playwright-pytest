@@ -55,7 +55,7 @@ extends:
             targetPath: $(Build.ArtifactStagingDirectory)/esrp-build
         steps:
           - checkout: none
-          - task: EsrpRelease@9
+          - task: EsrpRelease@10
             inputs:
               connectedservicename: 'Playwright-ESRP-PME'
               usemanagedidentity: true
@@ -69,8 +69,8 @@ extends:
               # contentsource: 'folder'
               folderlocation: '$(Build.ArtifactStagingDirectory)/esrp-build'
               waitforreleasecompletion: true
-              owners: 'maxschmitt@microsoft.com'
-              approvers: 'maxschmitt@microsoft.com'
+              owners: 'simonknott@microsoft.com'
+              approvers: 'simonknott@microsoft.com'
               serviceendpointurl: 'https://api.esrp.microsoft.com'
               mainpublisher: 'Playwright'
               domaintenantid: '975f013f-7f24-47e8-a7d3-abc4752bf346'
