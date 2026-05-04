@@ -1077,3 +1077,72 @@ def test_connect_options_should_work(testdir: pytest.Testdir) -> None:
         else:
             os.kill(server_process.pid, signal.SIGINT)
         server_process.wait()
+
+
+def test_soft_assertion_single_failure(testdir: pytest.Testdir) -> None:
+    testdir.makepyfile(
+        """
+        from playwright.sync_api import expect
+
+        def test_soft(page):
+            page.set_content("<div>hello</div>")
+            expect.soft(page.locator("div")).to_have_text("goodbye")
+    """
+    )
+    result = testdir.runpytest("--browser", "chromium")
+    result.assert_outcomes(passed=1, errors=1)
+    assert any("goodbye" in line for line in result.outlines)
+
+
+def test_soft_assertion_multiple_failures_exception_group(
+    testdir: pytest.Testdir,
+) -> None:
+    testdir.makepyfile(
+        """
+        from playwright.sync_api import expect
+
+        def test_soft(page):
+            page.set_content("<div>hello</div>")
+            expect.soft(page.locator("div")).to_have_text("first")
+            expect.soft(page.locator("div")).to_have_text("second")
+    """
+    )
+    result = testdir.runpytest("--browser", "chromium")
+    result.assert_outcomes(passed=1, errors=1)
+    out = "\n".join(result.outlines)
+    assert "first" in out and "second" in out
+
+
+def test_soft_assertion_passes_when_all_match(testdir: pytest.Testdir) -> None:
+    testdir.makepyfile(
+        """
+        from playwright.sync_api import expect
+
+        def test_soft(page):
+            page.set_content("<div>hello</div>")
+            expect.soft(page.locator("div")).to_have_text("hello")
+    """
+    )
+    result = testdir.runpytest("--browser", "chromium")
+    result.assert_outcomes(passed=1)
+
+
+def test_soft_assertion_does_not_shadow_body_failure(
+    testdir: pytest.Testdir,
+) -> None:
+    testdir.makepyfile(
+        """
+        from playwright.sync_api import expect
+
+        def test_soft(page):
+            page.set_content("<div>hello</div>")
+            expect.soft(page.locator("div")).to_have_text("soft-fail")
+            raise RuntimeError("body-fail")
+    """
+    )
+    result = testdir.runpytest("--browser", "chromium")
+    # Body raises during call, soft assertion raises during teardown.
+    result.assert_outcomes(failed=1, errors=1)
+    out = "\n".join(result.outlines)
+    assert "body-fail" in out
+    assert "soft-fail" in out

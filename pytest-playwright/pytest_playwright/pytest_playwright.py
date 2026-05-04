@@ -35,6 +35,7 @@ from typing import (
 )
 
 import pytest
+from playwright._impl._assertions import _soft_scope
 from playwright.sync_api import (
     Browser,
     BrowserContext,
@@ -84,6 +85,23 @@ def delete_output_dir(pytestconfig: Any) -> None:
             entries = os.listdir(output_dir)
             for entry in entries:
                 shutil.rmtree(entry)
+
+
+if sys.version_info >= (3, 11):
+    _BaseExceptionGroup = BaseExceptionGroup  # noqa: F821
+else:
+    from exceptiongroup import BaseExceptionGroup as _BaseExceptionGroup
+
+
+@pytest.fixture(autouse=True)
+def _playwright_soft_assertions() -> Generator[None, None, None]:
+    with _soft_scope() as errors:
+        yield
+    if not errors:
+        return
+    if len(errors) == 1:
+        raise errors[0]
+    raise _BaseExceptionGroup("Soft assertion failures", errors)
 
 
 def pytest_generate_tests(metafunc: Any) -> None:

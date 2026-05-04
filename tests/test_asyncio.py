@@ -1091,3 +1091,57 @@ def test_connect_options_should_work(testdir: pytest.Testdir) -> None:
         else:
             os.kill(server_process.pid, signal.SIGINT)
         server_process.wait()
+
+
+def test_soft_assertion_single_failure(testdir: pytest.Testdir) -> None:
+    testdir.makepyfile(
+        """
+        import pytest
+        from playwright.async_api import expect
+
+        @pytest.mark.asyncio
+        async def test_soft(page):
+            await page.set_content("<div>hello</div>")
+            await expect.soft(page.locator("div")).to_have_text("goodbye")
+    """
+    )
+    result = testdir.runpytest("--browser", "chromium")
+    result.assert_outcomes(passed=1, errors=1)
+    assert any("goodbye" in line for line in result.outlines)
+
+
+def test_soft_assertion_multiple_failures_exception_group(
+    testdir: pytest.Testdir,
+) -> None:
+    testdir.makepyfile(
+        """
+        import pytest
+        from playwright.async_api import expect
+
+        @pytest.mark.asyncio
+        async def test_soft(page):
+            await page.set_content("<div>hello</div>")
+            await expect.soft(page.locator("div")).to_have_text("first")
+            await expect.soft(page.locator("div")).to_have_text("second")
+    """
+    )
+    result = testdir.runpytest("--browser", "chromium")
+    result.assert_outcomes(passed=1, errors=1)
+    out = "\n".join(result.outlines)
+    assert "first" in out and "second" in out
+
+
+def test_soft_assertion_passes_when_all_match(testdir: pytest.Testdir) -> None:
+    testdir.makepyfile(
+        """
+        import pytest
+        from playwright.async_api import expect
+
+        @pytest.mark.asyncio
+        async def test_soft(page):
+            await page.set_content("<div>hello</div>")
+            await expect.soft(page.locator("div")).to_have_text("hello")
+    """
+    )
+    result = testdir.runpytest("--browser", "chromium")
+    result.assert_outcomes(passed=1)
