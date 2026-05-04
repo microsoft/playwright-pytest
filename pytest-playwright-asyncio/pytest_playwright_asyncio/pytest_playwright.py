@@ -37,6 +37,12 @@ from typing import (
 )
 
 import pytest
+
+if sys.version_info >= (3, 11):
+    _BaseExceptionGroup = BaseExceptionGroup  # noqa: F821
+else:
+    from exceptiongroup import BaseExceptionGroup as _BaseExceptionGroup
+
 from playwright._impl._assertions import _soft_scope
 from playwright.async_api import (
     Browser,
@@ -88,12 +94,6 @@ def delete_output_dir(pytestconfig: Any) -> None:
             entries = os.listdir(output_dir)
             for entry in entries:
                 shutil.rmtree(entry)
-
-
-if sys.version_info >= (3, 11):
-    _BaseExceptionGroup = BaseExceptionGroup  # noqa: F821
-else:
-    from exceptiongroup import BaseExceptionGroup as _BaseExceptionGroup
 
 
 @pytest.fixture(autouse=True)
