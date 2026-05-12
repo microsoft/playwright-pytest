@@ -1106,7 +1106,7 @@ def test_soft_assertion_single_failure(testdir: pytest.Testdir) -> None:
     """
     )
     result = testdir.runpytest("--browser", "chromium")
-    result.assert_outcomes(passed=1, errors=1)
+    result.assert_outcomes(failed=1)
     assert any("goodbye" in line for line in result.outlines)
 
 
@@ -1126,7 +1126,7 @@ def test_soft_assertion_multiple_failures_exception_group(
     """
     )
     result = testdir.runpytest("--browser", "chromium")
-    result.assert_outcomes(passed=1, errors=1)
+    result.assert_outcomes(failed=1)
     out = "\n".join(result.outlines)
     assert "first" in out and "second" in out
 
@@ -1145,3 +1145,26 @@ def test_soft_assertion_passes_when_all_match(testdir: pytest.Testdir) -> None:
     )
     result = testdir.runpytest("--browser", "chromium")
     result.assert_outcomes(passed=1)
+
+
+def test_soft_assertion_does_not_shadow_body_failure(
+    testdir: pytest.Testdir,
+) -> None:
+    testdir.makepyfile(
+        """
+        import pytest
+        from playwright.async_api import expect
+
+        @pytest.mark.asyncio
+        async def test_soft(page):
+            await page.set_content("<div>hello</div>")
+            await expect.soft(page.locator("div")).to_have_text("soft-fail")
+            raise RuntimeError("body-fail")
+    """
+    )
+    result = testdir.runpytest("--browser", "chromium")
+    # Body and soft assertion failures are grouped in call phase.
+    result.assert_outcomes(failed=1)
+    out = "\n".join(result.outlines)
+    assert "body-fail" in out
+    assert "soft-fail" in out

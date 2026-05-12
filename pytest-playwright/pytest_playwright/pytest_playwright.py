@@ -41,7 +41,10 @@ if sys.version_info >= (3, 11):
 else:
     from exceptiongroup import BaseExceptionGroup as _BaseExceptionGroup
 
-from playwright._impl._assertions import _soft_scope
+try:
+    from playwright._impl._assertions import _soft_scope
+except ImportError:
+    _soft_scope = None
 from playwright.sync_api import (
     Browser,
     BrowserContext,
@@ -93,12 +96,25 @@ def delete_output_dir(pytestconfig: Any) -> None:
                 shutil.rmtree(entry)
 
 
-@pytest.fixture(autouse=True)
-def _playwright_soft_assertions() -> Generator[None, None, None]:
-    with _soft_scope() as errors:
+@pytest.hookimpl(wrapper=True, tryfirst=True)
+def pytest_runtest_call(item: Any) -> Generator[None, Any, None]:
+    if _soft_scope is None:
         yield
-    if not errors:
         return
+    hard_failure: Optional[BaseException] = None
+    with _soft_scope() as errors:
+        try:
+            yield
+        except BaseException as exc:
+            hard_failure = exc
+    if not errors:
+        if hard_failure is not None:
+            raise hard_failure
+        return
+    if hard_failure is not None:
+        raise _BaseExceptionGroup(
+            "Test and soft assertion failures", [hard_failure, *errors]
+        )
     if len(errors) == 1:
         raise errors[0]
     raise _BaseExceptionGroup("Soft assertion failures", errors)
