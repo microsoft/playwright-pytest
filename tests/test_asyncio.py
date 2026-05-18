@@ -1045,6 +1045,7 @@ def test_with_page(page):
     ]
 
 
+@pytest.mark.skip(reason="requires 1.60")
 def test_connect_options_should_work(testdir: pytest.Testdir) -> None:
     server_process = None
     try:
@@ -1110,6 +1111,7 @@ def test_soft_assertion_single_failure(testdir: pytest.Testdir) -> None:
     assert any("goodbye" in line for line in result.outlines)
 
 
+@pytest.mark.skip(reason="requires 1.60")
 def test_soft_assertion_multiple_failures_exception_group(
     testdir: pytest.Testdir,
 ) -> None:
@@ -1131,6 +1133,7 @@ def test_soft_assertion_multiple_failures_exception_group(
     assert "first" in out and "second" in out
 
 
+@pytest.mark.skip(reason="requires 1.60")
 def test_soft_assertion_passes_when_all_match(testdir: pytest.Testdir) -> None:
     testdir.makepyfile(
         """
@@ -1147,6 +1150,7 @@ def test_soft_assertion_passes_when_all_match(testdir: pytest.Testdir) -> None:
     result.assert_outcomes(passed=1)
 
 
+@pytest.mark.skip(reason="requires 1.60")
 def test_soft_assertion_does_not_shadow_body_failure(
     testdir: pytest.Testdir,
 ) -> None:
