@@ -9,3 +9,4 @@ pre-commit==4.0.1
 Django==4.2.24
 pytest-xdist==3.8.0
 pytest-asyncio==1.3.0
+playwright>=1.60
