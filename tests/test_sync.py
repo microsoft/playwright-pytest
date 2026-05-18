@@ -1045,7 +1045,7 @@ def test_connect_options_should_work(testdir: pytest.Testdir) -> None:
             @pytest.fixture(scope="session")
             def connect_options():
                 return {
-                    "ws_endpoint": "ws://localhost:1234",
+                    "endpoint": "ws://localhost:1234",
                 }
             """
         )
@@ -1056,7 +1056,7 @@ def test_connect_options_should_work(testdir: pytest.Testdir) -> None:
             """
         )
         result = testdir.runpytest()
-        assert "connect ECONNREFUSED" in "".join(result.outlines)
+        assert "connect ECONNREFUSED" in "\n".join(result.outlines + result.errlines)
         server_process = subprocess.Popen(
             ["playwright", "run-server", "--port=1234"],
             stdout=subprocess.PIPE,
