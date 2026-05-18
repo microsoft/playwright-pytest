@@ -41,6 +41,10 @@ elif sys.platform == "win32":
 
 os.environ["PLAYWRIGHT_BROWSERS_PATH"] = playwright_browser_path
 
+# Ensure subprocess pytester runs (and any child python processes) emit utf-8
+# on stdout/stderr so pytester's utf-8 decoding doesn't break on Windows.
+os.environ["PYTHONIOENCODING"] = "utf-8"
+
 
 class HTTPTestServer:
     PREFIX = ""
