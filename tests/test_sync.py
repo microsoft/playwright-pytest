@@ -13,10 +13,10 @@
 # limitations under the License.
 
 import os
-from pathlib import Path
 import signal
 import subprocess
 import sys
+from pathlib import Path
 
 import pytest
 
@@ -497,7 +497,7 @@ def test_invalid_browser_name(testdir: pytest.Testdir) -> None:
     """
     )
     result = testdir.runpytest("--browser", "test123")
-    assert any(["--browser: invalid choice" in line for line in result.errlines])
+    assert any("--browser: invalid choice" in line for line in result.errlines)
 
 
 def test_django(testdir: pytest.Testdir) -> None:

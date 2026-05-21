@@ -489,7 +489,7 @@ def test_invalid_browser_name(testdir: pytest.Testdir) -> None:
     """
     )
     result = testdir.runpytest("--browser", "test123")
-    assert any(["--browser: invalid choice" in line for line in result.errlines])
+    assert any("--browser: invalid choice" in line for line in result.errlines)
 
 
 def test_browser_context_args_device(testdir: pytest.Testdir) -> None:
