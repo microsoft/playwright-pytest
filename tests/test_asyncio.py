@@ -175,6 +175,31 @@ def test_multiple_browsers(testdir: pytest.Testdir) -> None:
     result.assert_outcomes(passed=3)
 
 
+def test_multiple_browsers_with_overridden_page_fixture(
+    testdir: pytest.Testdir,
+) -> None:
+    # Overriding the "page" fixture must not disable running the test against
+    # each requested browser.
+    # https://github.com/microsoft/playwright-pytest/issues/172
+    testdir.makepyfile(
+        """
+        import pytest
+
+        @pytest.fixture
+        def page(page):
+            yield page
+
+        def test_a(page):
+            pass
+    """
+    )
+    result = testdir.runpytest(
+        "--collect-only", "-q", "--browser", "chromium", "--browser", "firefox"
+    )
+    assert result.ret == 0
+    result.stdout.fnmatch_lines(["*test_a*chromium*", "*test_a*firefox*"])
+
+
 def test_browser_context_args(testdir: pytest.Testdir) -> None:
     testdir.makeconftest(
         """
