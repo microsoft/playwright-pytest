@@ -14,6 +14,7 @@
 
 import hashlib
 import json
+import secrets
 import shutil
 import os
 import sys
@@ -137,6 +138,18 @@ def pytest_configure(config: Any) -> None:
         "markers",
         "browser_context_args(**kwargs): provide additional arguments to browser.new_context()",
     )
+    if config.getoption("--playwright-debug", default=None) == "cli":
+        if getattr(config.option, "capture", "fd") != "no":
+            raise pytest.UsageError(
+                "--playwright-debug=cli requires disabled output capture "
+                "(pass -s or --capture=no) so the attach command is visible."
+            )
+        worker_count = _xdist_worker_count(config)
+        if worker_count is not None and worker_count != 1:
+            raise pytest.UsageError(
+                "--playwright-debug=cli requires a single worker "
+                "(do not use pytest-xdist -n > 1)."
+            )
 
 
 # Making test result information available in fixtures
@@ -372,6 +385,7 @@ def new_context(
     additional_context_args = context_args_marker.kwargs if context_args_marker else {}
     browser_context_args.update(additional_context_args)
     contexts: List[BrowserContext] = []
+    debug_cli = request.config.getoption("--playwright-debug", default=None) == "cli"
 
     def _new_context(**kwargs: Any) -> BrowserContext:
         context = browser.new_context(**browser_context_args, **kwargs)
@@ -383,6 +397,10 @@ def new_context(
             original_close(*args, **kwargs)
 
         context.close = _close_wrapper
+        if (
+            debug_cli and not contexts
+        ):  # CLI attach drives contexts()[0] only — bind/print/pause on first context.
+            _run_debug_cli(browser, context, str(request.config.rootpath))
         contexts.append(context)
         _artifacts_recorder.on_did_create_browser_context(context)
         return context
@@ -444,6 +462,46 @@ def device(pytestconfig: Any) -> Optional[str]:
 
 PW_ASYNC_CANONICAL_NAME = "pytest_playwright_asyncio.pytest_playwright"
 PLUGIN_INCOMPATIBLE_MESSAGE = "pytest-playwright and pytest-playwright-asyncio are not compatible. Please use only one of them."
+
+
+def _run_debug_cli(
+    browser: Browser, context: BrowserContext, workspace_dir: str
+) -> None:
+    if (
+        not callable(getattr(browser, "bind", None))
+        or getattr(context, "debugger", None) is None
+    ):
+        raise pytest.UsageError("--playwright-debug=cli requires playwright>=1.59")
+
+    session_name = f"tw-{secrets.token_hex(3)}"
+    browser.bind(session_name, workspace_dir=workspace_dir)
+
+    # Leading newline: with -s, pytest prints "test_foo.py " with no trailing
+    # newline before fixtures run; start our banner on its own line.
+    print(
+        "\n### The test is currently paused at the start\n"
+        "\n"
+        "### Debugging Instructions\n"
+        f"- Run `python -m playwright cli attach {session_name}` "
+        "to attach to this test\n",
+        flush=True,
+    )
+
+    context.set_default_timeout(0)
+    context.set_default_navigation_timeout(0)
+    context.debugger.request_pause()
+
+
+def _xdist_worker_count(config: Any) -> Optional[int]:
+    numprocesses = getattr(config.option, "numprocesses", None)
+    if numprocesses is None:
+        return None
+    if numprocesses == "logical" or numprocesses == "auto":
+        return 2
+    try:
+        return int(numprocesses)
+    except (TypeError, ValueError):
+        return 2
 
 
 def pytest_addoption(
@@ -520,6 +578,12 @@ def pytest_addoption(
         action="store_true",
         default=False,
         help="Whether to take a full page screenshot",
+    )
+    group.addoption(
+        "--playwright-debug",
+        default=None,
+        choices=["cli"],
+        help="Enable Playwright CLI debugging. Requires -s/--capture=no.",
     )
 
 

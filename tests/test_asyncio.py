@@ -20,6 +20,7 @@ import sys
 import pytest
 
 from tests.conftest import HTTPTestServer
+from tests.utils import attach_snapshot_resume
 
 
 @pytest.fixture
@@ -1168,3 +1169,47 @@ def test_soft_assertion_does_not_shadow_body_failure(
     out = "\n".join(result.outlines)
     assert "body-fail" in out
     assert "soft-fail" in out
+
+
+def test_playwright_debug_cli_requires_no_capture(testdir: pytest.Testdir) -> None:
+    testdir.makepyfile(
+        """
+import pytest
+@pytest.mark.asyncio
+async def test_dummy():
+    assert True
+"""
+    )
+    result = testdir.runpytest("--playwright-debug=cli")
+    assert result.ret != 0
+    assert "capture" in "\n".join(result.outlines + result.errlines).lower()
+
+
+def test_playwright_debug_cli_rejects_multiple_xdist_workers(
+    testdir: pytest.Testdir,
+) -> None:
+    pytest.importorskip("xdist")
+    testdir.makepyfile(
+        """
+import pytest
+@pytest.mark.asyncio
+async def test_dummy():
+    assert True
+"""
+    )
+    result = testdir.runpytest("--playwright-debug=cli", "-s", "-n", "2")
+    assert result.ret != 0
+    assert "single worker" in "\n".join(result.outlines + result.errlines)
+
+
+def test_playwright_debug_cli_attach_snapshot_resume(testdir: pytest.Testdir) -> None:
+    testdir.makepyfile(
+        """
+import pytest
+@pytest.mark.asyncio
+async def test_example(page):
+    await page.set_content("<button>Hi</button>")
+    assert await page.get_by_role("button").is_visible()
+"""
+    )
+    attach_snapshot_resume(testdir)
