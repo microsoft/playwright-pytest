@@ -127,7 +127,8 @@ def pytest_runtest_call(item: Any) -> Generator[None, Any, None]:
 def pytest_generate_tests(metafunc: Any) -> None:
     if "browser_name" in metafunc.fixturenames:
         browsers = metafunc.config.option.browser or ["chromium"]
-        metafunc.parametrize("browser_name", browsers, scope="session")
+        if "browser_name" not in getattr(metafunc, "params", {}):
+            metafunc.parametrize("browser_name", browsers, scope="session")
 
 
 def pytest_configure(config: Any) -> None:
