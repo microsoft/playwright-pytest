@@ -121,7 +121,20 @@ def pytest_runtest_call(item: Any) -> Generator[None, Any, None]:
     raise _BaseExceptionGroup("Soft assertion failures", errors)
 
 
+# Fixtures defined by this plugin that (transitively) require a browser and
+# therefore "browser_name". When one of them is requested through a user
+# override of e.g. the "page" fixture, some pytest versions drop "browser_name"
+# from the fixture closure, which would silently disable running the test
+# against multiple browsers.
+# https://github.com/microsoft/playwright-pytest/issues/172
+_BROWSER_FIXTURES = ("page", "context", "new_context", "browser", "browser_type")
+
+
 def pytest_generate_tests(metafunc: Any) -> None:
+    if "browser_name" not in metafunc.fixturenames and any(
+        name in metafunc.fixturenames for name in _BROWSER_FIXTURES
+    ):
+        metafunc.fixturenames.append("browser_name")
     if "browser_name" in metafunc.fixturenames:
         browsers = metafunc.config.option.browser or ["chromium"]
         metafunc.parametrize("browser_name", browsers, scope="session")
