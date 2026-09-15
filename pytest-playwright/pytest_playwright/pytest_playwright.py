@@ -121,8 +121,21 @@ def pytest_runtest_call(item: Any) -> Generator[None, Any, None]:
     raise _BaseExceptionGroup("Soft assertion failures", errors)
 
 
+_PLAYWRIGHT_FIXTURES = frozenset(
+    {
+        "browser_name",
+        "browser",
+        "browser_type",
+        "context",
+        "page",
+        "browser_context_args",
+        "browser_type_launch_args",
+    }
+)
+
+
 def pytest_generate_tests(metafunc: Any) -> None:
-    if "browser_name" in metafunc.fixturenames:
+    if _PLAYWRIGHT_FIXTURES & set(metafunc.fixturenames):
         browsers = metafunc.config.option.browser or ["chromium"]
         metafunc.parametrize("browser_name", browsers, scope="session")
 
