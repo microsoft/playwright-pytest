@@ -462,6 +462,36 @@ def test_base_url_via_fixture(
     result.assert_outcomes(passed=1)
 
 
+@pytest.mark.parametrize("source", ["option", "ini", "env", "none"])
+def test_base_url_without_pytest_base_url(
+    testdir: pytest.Testdir,
+    test_server: HTTPTestServer,
+    monkeypatch: pytest.MonkeyPatch,
+    source: str,
+) -> None:
+    # https://github.com/microsoft/playwright-pytest/issues/311
+    args = ["-p", "no:base_url"]
+    if source == "option":
+        args += ["--base-url", test_server.PREFIX]
+    elif source == "ini":
+        args += ["-o", f"base_url={test_server.PREFIX}"]
+    elif source == "env":
+        monkeypatch.setenv("PYTEST_BASE_URL", test_server.PREFIX)
+    expected = None if source == "none" else test_server.PREFIX
+    testdir.makepyfile(
+        f"""
+        def test_base_url(page, base_url):
+            assert base_url == {expected!r}
+            page.goto("{test_server.PREFIX}/foobar")
+            if base_url:
+                page.goto("/foobar")
+                assert page.url == "{test_server.PREFIX}/foobar"
+    """
+    )
+    result = testdir.runpytest(*args)
+    result.assert_outcomes(passed=1)
+
+
 def test_skip_browsers(testdir: pytest.Testdir) -> None:
     testdir.makepyfile(
         """

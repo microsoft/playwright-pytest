@@ -25,9 +25,11 @@ dynamic = ["version"]
 dependencies = [
     "playwright>=1.18",
     "pytest>=6.2.4,<10.0.0",
-    "pytest-base-url>=1.0.0,<3.0.0",
     "python-slugify>=6.0.0,<10.0.0",
 ]
+
+[project.optional-dependencies]
+base-url = ["pytest-base-url>=1.0.0,<3.0.0"]
 
 [project.urls]
 homepage = "https://github.com/microsoft/playwright-pytest"

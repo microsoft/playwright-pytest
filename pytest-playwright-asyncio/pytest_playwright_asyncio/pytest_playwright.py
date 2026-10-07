@@ -14,6 +14,7 @@
 
 import base64
 import hashlib
+import importlib.util
 import json
 import secrets
 import shutil
@@ -157,6 +158,8 @@ def pytest_generate_tests(metafunc: Any) -> None:
 
 
 def pytest_configure(config: Any) -> None:
+    if not config.pluginmanager.has_plugin("base_url"):
+        config.pluginmanager.register(_BaseUrlFallback(), "playwright-base-url")
     config.addinivalue_line(
         "markers", "skip_browser(name): mark test to be skipped a specific browser"
     )
@@ -760,6 +763,37 @@ def pytest_addoption(
         choices=["cli"],
         help="Enable Playwright CLI debugging. Requires -s/--capture=no.",
     )
+    if not _is_pytest_base_url_available(pluginmanager):
+        # Same options as the optional pytest-base-url plugin.
+        parser.addini("base_url", help="base url for the application under test.")
+        parser.addoption(
+            "--base-url",
+            metavar="url",
+            default=os.getenv("PYTEST_BASE_URL", None),
+            help="base url for the application under test.",
+        )
+
+
+def _is_pytest_base_url_available(pluginmanager: pytest.PytestPluginManager) -> bool:
+    # pytest-base-url is optional (pip install pytest-playwright[base-url]); when
+    # used it provides --base-url and the base_url fixture.
+    if importlib.util.find_spec("pytest_base_url") is None:
+        return False
+    return not pluginmanager.is_blocked("base_url")
+
+
+class _BaseUrlFallback:
+    # Provides the base_url fixture when pytest-base-url is not used.
+    @pytest.fixture(scope="session")
+    def base_url(self, pytestconfig: Any) -> Optional[str]:
+        base_url = pytestconfig.getoption("--base-url", default=None)
+        if base_url:
+            return base_url
+        try:
+            return pytestconfig.getini("base_url") or None
+        except ValueError:
+            # --base-url and the ini value are not registered.
+            return None
 
 
 class ArtifactsRecorder:
