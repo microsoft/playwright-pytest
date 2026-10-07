@@ -12,11 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import html
+import json
 import os
 import signal
 import subprocess
 import sys
 from typing import Optional
+from xml.etree import ElementTree
 
 import pytest
 
@@ -1101,6 +1104,49 @@ def test_artifacts_are_kept_per_rerun_attempt(testdir: pytest.Testdir) -> None:
   - video.webm
 """,
     )
+
+
+def test_artifacts_are_attached_to_reports(testdir: pytest.Testdir) -> None:
+    # https://github.com/microsoft/playwright-pytest/issues/121
+    testdir.makepyfile(
+        """
+        import pytest
+
+        @pytest.mark.asyncio
+        async def test_failing(page):
+            await page.set_content("<div>hello</div>")
+            raise Exception("Failed")
+    """
+    )
+    result = testdir.runpytest(
+        "--screenshot",
+        "on",
+        "--video",
+        "on",
+        "--tracing",
+        "on",
+        "--junitxml",
+        "junit.xml",
+        "--html",
+        os.path.join("report", "index.html"),
+    )
+    result.assert_outcomes(failed=1)
+    folder_name = "test-artifacts-are-attached-to-reports-py-test-failing-chromium"
+    folder = testdir.tmpdir.join("test-results", folder_name)
+    junit = ElementTree.parse(str(testdir.tmpdir.join("junit.xml")))
+    properties = {
+        prop.get("name"): prop.get("value") for prop in junit.iter("property")
+    }
+    assert properties == {
+        "playwright_screenshot": folder.join("test-failed-1.png").strpath,
+        "playwright_trace": folder.join("trace.zip").strpath,
+        "playwright_video": folder.join("video.webm").strpath,
+    }
+    report = testdir.tmpdir.join("report", "index.html").read()
+    trace_link = os.path.join("..", "test-results", folder_name, "trace.zip")
+    assert html.escape(json.dumps(trace_link)[1:-1]) in report
+    assets = testdir.tmpdir.join("report", "assets").listdir()
+    assert sorted(p.ext for p in assets if p.ext != ".css") == [".png", ".webm"]
 
 
 def test_should_work_with_test_names_which_exceeds_256_characters(
