@@ -176,6 +176,42 @@ def test_multiple_browsers(testdir: pytest.Testdir) -> None:
     result.assert_outcomes(passed=3)
 
 
+def test_browser_parametrization_keeps_module_order(testdir: pytest.Testdir) -> None:
+    # https://github.com/microsoft/playwright-pytest/issues/304
+    testdir.makepyfile(
+        test_a="""
+        import pytest
+
+        @pytest.mark.parametrize("param", ["a1", "a2"])
+        @pytest.mark.asyncio
+        async def test_a(page, param):
+            pass
+    """,
+        test_b="""
+        import pytest
+
+        @pytest.mark.parametrize("param", ["b1", "b2"])
+        @pytest.mark.asyncio
+        async def test_b(page, param):
+            pass
+    """,
+    )
+    result = testdir.runpytest(
+        "--collect-only", "-q", "--browser", "chromium", "--browser", "firefox"
+    )
+    assert result.ret == 0
+    assert [line for line in result.outlines if "::" in line] == [
+        "test_a.py::test_a[chromium-a1]",
+        "test_a.py::test_a[chromium-a2]",
+        "test_b.py::test_b[chromium-b1]",
+        "test_b.py::test_b[chromium-b2]",
+        "test_a.py::test_a[firefox-a1]",
+        "test_a.py::test_a[firefox-a2]",
+        "test_b.py::test_b[firefox-b1]",
+        "test_b.py::test_b[firefox-b2]",
+    ]
+
+
 def test_browser_context_args(testdir: pytest.Testdir) -> None:
     testdir.makeconftest(
         """
