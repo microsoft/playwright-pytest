@@ -1054,6 +1054,36 @@ def test_artifact_errors_are_reported_as_teardown_errors(
     )
 
 
+def test_artifacts_are_kept_per_rerun_attempt(testdir: pytest.Testdir) -> None:
+    # https://github.com/microsoft/playwright-pytest/issues/210
+    testdir.makepyfile(
+        """
+        import pytest
+
+        attempts = 0
+
+        @pytest.mark.asyncio
+        async def test_flaky(page):
+            global attempts
+            attempts += 1
+            assert attempts == 3
+    """
+    )
+    result = testdir.runpytest("--reruns", "2", "--tracing", "retain-on-failure")
+    result.assert_outcomes(passed=1)
+    assert result.parseoutcomes()["rerun"] == 2
+    test_results_dir = os.path.join(testdir.tmpdir, "test-results")
+    _assert_folder_structure(
+        test_results_dir,
+        """
+- test-artifacts-are-kept-per-rerun-attempt-py-test-flaky-chromium:
+  - trace.zip
+- test-artifacts-are-kept-per-rerun-attempt-py-test-flaky-chromium-retry1:
+  - trace.zip
+""",
+    )
+
+
 def test_should_work_with_test_names_which_exceeds_256_characters(
     testdir: pytest.Testdir,
 ) -> None:

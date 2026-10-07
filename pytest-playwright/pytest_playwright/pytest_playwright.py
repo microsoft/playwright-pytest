@@ -318,7 +318,13 @@ def _is_debugger_attached() -> bool:
 @pytest.fixture
 def output_path(pytestconfig: Any, request: pytest.FixtureRequest) -> str:
     output_dir = Path(pytestconfig.getoption("--output")).absolute()
-    return os.path.join(output_dir, _truncate_file_name(slugify(request.node.nodeid)))
+    folder_name = slugify(request.node.nodeid)
+    # pytest-rerunfailures runs failed tests again; keep each attempt's artifacts
+    # in its own folder, like Playwright Test does.
+    retry = getattr(request.node, "execution_count", 1) - 1
+    if retry > 0:
+        folder_name += f"-retry{retry}"
+    return os.path.join(output_dir, _truncate_file_name(folder_name))
 
 
 def _truncate_file_name(file_name: str) -> str:
