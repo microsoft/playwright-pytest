@@ -19,6 +19,7 @@ import subprocess
 import sys
 from typing import Optional
 from xml.etree import ElementTree
+import zipfile
 
 import pytest
 
@@ -1246,6 +1247,52 @@ def test_artifacts_are_attached_to_reports(testdir: pytest.Testdir) -> None:
     assert "data:video/webm;base64," in report
 
 
+def test_traces_api_request_contexts(
+    testdir: pytest.Testdir, test_server: HTTPTestServer
+) -> None:
+    # https://github.com/microsoft/playwright-pytest/issues/137
+    testdir.makeconftest(
+        f"""
+        import pytest_asyncio
+
+        @pytest_asyncio.fixture(scope="session")
+        async def api_request_context(playwright):
+            context = await playwright.request.new_context(base_url="{test_server.PREFIX}")
+            yield context
+            await context.dispose()
+
+        @pytest_asyncio.fixture
+        async def function_api_request_context(playwright):
+            context = await playwright.request.new_context(base_url="{test_server.PREFIX}")
+            yield context
+            await context.dispose()
+    """
+    )
+    testdir.makepyfile(
+        """
+        import pytest
+
+        @pytest.mark.asyncio
+        async def test_session_context_1(api_request_context):
+            await api_request_context.get("/one")
+
+        @pytest.mark.asyncio
+        async def test_session_context_2(api_request_context):
+            await api_request_context.get("/two")
+
+        @pytest.mark.asyncio
+        async def test_function_context(function_api_request_context):
+            await function_api_request_context.get("/three")
+
+        @pytest.mark.asyncio
+        async def test_failing(api_request_context):
+            await api_request_context.get("/four")
+            raise Exception("Failed")
+    """
+    )
+    _assert_api_request_traces(testdir)
+
+
 def test_should_work_with_test_names_which_exceeds_256_characters(
     testdir: pytest.Testdir,
 ) -> None:
@@ -1293,6 +1340,37 @@ def _assert_folder_structure(root: str, expected: str) -> None:
         print("Expected:")
         print(expected)
         raise AssertionError("Actual tree does not match expected tree")
+
+
+def _assert_api_request_traces(testdir: pytest.Testdir) -> None:
+    __tracebackhide__ = True
+    test_results_dir = os.path.join(testdir.tmpdir, "test-results")
+    prefix = os.path.join(test_results_dir, "test-traces-api-request-contexts-py-test-")
+
+    result = testdir.runpytest("--tracing", "on")
+    result.assert_outcomes(passed=3, failed=1)
+    # Each test gets a trace with only its own requests, including tests that
+    # share a session-scoped context.
+    assert _trace_request_urls(prefix + "session-context-1/trace.zip") == ["/one"]
+    assert _trace_request_urls(prefix + "session-context-2/trace.zip") == ["/two"]
+    assert _trace_request_urls(prefix + "function-context/trace.zip") == ["/three"]
+    assert _trace_request_urls(prefix + "failing/trace.zip") == ["/four"]
+
+    result = testdir.runpytest("--tracing", "retain-on-failure")
+    result.assert_outcomes(passed=3, failed=1)
+    _assert_folder_structure(
+        test_results_dir,
+        """
+- test-traces-api-request-contexts-py-test-failing:
+  - trace.zip
+""",
+    )
+
+
+def _trace_request_urls(trace_path: str) -> list:
+    with zipfile.ZipFile(trace_path) as trace:
+        events = [json.loads(line) for line in trace.read("trace.trace").splitlines()]
+    return [event["params"]["url"] for event in events if event["type"] == "before"]
 
 
 def test_is_able_to_set_expect_timeout_via_conftest(testdir: pytest.Testdir) -> None:

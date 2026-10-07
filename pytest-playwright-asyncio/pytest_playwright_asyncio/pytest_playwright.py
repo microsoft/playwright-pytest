@@ -20,6 +20,7 @@ import shutil
 import os
 import sys
 import warnings
+import zipfile
 from pathlib import Path
 from typing import (
     Any,
@@ -34,6 +35,7 @@ from typing import (
     Optional,
     Protocol,
     Sequence,
+    Set,
     Tuple,
     Union,
     Pattern,
@@ -52,6 +54,7 @@ try:
 except ImportError:
     _soft_scope = None
 from playwright.async_api import (
+    APIRequestContext,
     Browser,
     BrowserContext,
     BrowserType,
@@ -438,11 +441,19 @@ async def _artifacts_recorder(
     playwright: Playwright,
     pytestconfig: Any,
     _pw_artifacts_folder: tempfile.TemporaryDirectory,
+    _pw_api_request_contexts: Optional["_APIRequestContexts"],
 ) -> AsyncGenerator["ArtifactsRecorder", None]:
     artifacts_recorder = ArtifactsRecorder(
-        pytestconfig, request, output_path, playwright, _pw_artifacts_folder
+        pytestconfig,
+        request,
+        output_path,
+        playwright,
+        _pw_artifacts_folder,
+        _pw_api_request_contexts,
     )
+    await artifacts_recorder.start_api_request_tracing()
     yield artifacts_recorder
+    await artifacts_recorder.stop_api_request_tracing()
     await artifacts_recorder.collect_videos()
     if _test_failed_before_teardown(request.node):
         artifacts_recorder.did_finish_test(failed=True)
@@ -452,9 +463,31 @@ async def _artifacts_recorder(
     setattr(request.node, _ARTIFACTS_RECORDER_ATTR, artifacts_recorder)
 
 
+@pytest.fixture(autouse=True)
+def _pw_trace_api_requests(request: pytest.FixtureRequest) -> None:
+    # Tests that only use playwright.request (no page or context) don't request
+    # the artifacts recorder otherwise, and it records API request traces too.
+    if (
+        "playwright" in request.fixturenames
+        and request.config.getoption("--tracing") != "off"
+    ):
+        request.getfixturevalue("_artifacts_recorder")
+
+
+@pytest.fixture(scope="session")
+def _pw_api_request_contexts(pytestconfig: Any) -> Optional["_APIRequestContexts"]:
+    if pytestconfig.getoption("--tracing") == "off":
+        return None
+    return _APIRequestContexts()
+
+
 @pytest_asyncio.fixture(scope="session")
-async def playwright() -> AsyncGenerator[Playwright, None]:
+async def playwright(
+    _pw_api_request_contexts: Optional["_APIRequestContexts"],
+) -> AsyncGenerator[Playwright, None]:
     pw = await async_playwright().start()
+    if _pw_api_request_contexts:
+        _pw_api_request_contexts.instrument(pw)
     yield pw
     await pw.stop()
 
@@ -811,8 +844,10 @@ class ArtifactsRecorder:
         output_path: str,
         playwright: Playwright,
         pw_artifacts_folder: tempfile.TemporaryDirectory,
+        api_request_contexts: Optional["_APIRequestContexts"] = None,
     ) -> None:
         self._request = request
+        self._api_request_contexts = api_request_contexts
         self._pytestconfig = pytestconfig
         self._playwright = playwright
         self._output_path = output_path
@@ -942,6 +977,94 @@ class ArtifactsRecorder:
                     self._screenshots.append(str(screenshot_path))
                 except Error:
                     pass
+
+    async def start_api_request_tracing(self) -> None:
+        contexts = self._api_request_contexts
+        if contexts is None:
+            return
+        contexts.recorder = self
+        for context in contexts.live:
+            if context not in contexts.tracing_chunk:
+                await context.tracing.start_chunk(
+                    title=slugify(self._request.node.nodeid)
+                )
+                contexts.tracing_chunk.add(context)
+
+    async def stop_api_request_tracing(self) -> None:
+        contexts = self._api_request_contexts
+        if contexts is None:
+            return
+        contexts.recorder = None
+        for context in contexts.live:
+            await self.on_will_dispose_api_request_context(context)
+
+    async def on_will_dispose_api_request_context(
+        self, context: APIRequestContext
+    ) -> None:
+        contexts = self._api_request_contexts
+        if contexts is None or context not in contexts.tracing_chunk:
+            return
+        contexts.tracing_chunk.discard(context)
+        trace_path = Path(self._pw_artifacts_folder.name) / _create_guid()
+        try:
+            await context.tracing.stop_chunk(path=trace_path)
+        except Error:
+            return
+        if not _trace_has_actions(trace_path):
+            # A long-lived context (e.g. session-scoped) the test did not use.
+            os.remove(trace_path)
+            return
+        self._traces.append(str(trace_path))
+
+
+class _APIRequestContexts:
+    # Tracks contexts created via playwright.request.new_context() so that, like
+    # browser contexts, their traces are recorded per test.
+
+    def __init__(self) -> None:
+        self.live: List[APIRequestContext] = []
+        # Contexts with a trace chunk in progress.
+        self.tracing_chunk: Set[APIRequestContext] = set()
+        # Recorder of the running test, if any.
+        self.recorder: Optional[ArtifactsRecorder] = None
+
+    def instrument(self, playwright: Playwright) -> None:
+        original_new_context = playwright.request.new_context
+
+        async def _new_context(*args: Any, **kwargs: Any) -> APIRequestContext:
+            context = await original_new_context(*args, **kwargs)
+            if getattr(context, "tracing", None) is None:
+                # APIRequestContext.tracing requires playwright>=1.60.
+                return context
+            original_dispose = context.dispose
+
+            async def _dispose_wrapper(*args: Any, **kwargs: Any) -> None:
+                if context in self.live:
+                    self.live.remove(context)
+                if self.recorder is not None:
+                    await self.recorder.on_will_dispose_api_request_context(context)
+                self.tracing_chunk.discard(context)
+                await original_dispose(*args, **kwargs)
+
+            context.dispose = _dispose_wrapper
+            await context.tracing.start(screenshots=True, snapshots=True, sources=True)
+            self.live.append(context)
+            self.tracing_chunk.add(context)
+            return context
+
+        playwright.request.new_context = _new_context
+
+
+def _trace_has_actions(trace_path: Path) -> bool:
+    try:
+        with zipfile.ZipFile(trace_path) as trace:
+            return any(
+                b'"type":"before"' in trace.read(name)
+                for name in trace.namelist()
+                if name.endswith(".trace")
+            )
+    except (OSError, zipfile.BadZipFile):
+        return True
 
 
 def _create_guid() -> str:
