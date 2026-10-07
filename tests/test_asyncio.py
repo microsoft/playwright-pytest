@@ -938,6 +938,63 @@ def test_artifacts_retain_on_failure(testdir: pytest.Testdir) -> None:
     )
 
 
+def test_artifacts_retain_on_failure_when_fixture_fails(
+    testdir: pytest.Testdir,
+) -> None:
+    # https://github.com/microsoft/playwright-pytest/issues/117
+    testdir.makepyfile(
+        """
+        import pytest
+        import pytest_asyncio
+
+        @pytest_asyncio.fixture
+        async def failing_setup(page):
+            await page.goto("data:text/html,<div>setup</div>")
+            raise Exception("setup failed")
+
+        @pytest_asyncio.fixture
+        async def failing_teardown(page):
+            yield page
+            raise Exception("teardown failed")
+
+        @pytest.mark.asyncio
+        async def test_passing(page):
+            assert 2 == await page.evaluate("1 + 1")
+
+        @pytest.mark.asyncio
+        async def test_setup_fails(failing_setup):
+            pass
+
+        @pytest.mark.asyncio
+        async def test_teardown_fails(failing_teardown):
+            await failing_teardown.goto("data:text/html,<div>teardown</div>")
+    """
+    )
+    result = testdir.runpytest(
+        "--screenshot",
+        "only-on-failure",
+        "--video",
+        "retain-on-failure",
+        "--tracing",
+        "retain-on-failure",
+    )
+    result.assert_outcomes(passed=2, errors=2)
+    test_results_dir = os.path.join(testdir.tmpdir, "test-results")
+    _assert_folder_structure(
+        test_results_dir,
+        """
+- test-artifacts-retain-on-failure-when-fixture-fails-py-test-setup-fails-chromium:
+  - test-failed-1.png
+  - trace.zip
+  - video.webm
+- test-artifacts-retain-on-failure-when-fixture-fails-py-test-teardown-fails-chromium:
+  - test-failed-1.png
+  - trace.zip
+  - video.webm
+""",
+    )
+
+
 def test_should_work_with_test_names_which_exceeds_256_characters(
     testdir: pytest.Testdir,
 ) -> None:
