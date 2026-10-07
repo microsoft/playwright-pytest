@@ -139,6 +139,30 @@ def test_browser_channel(channel: str, testdir: pytest.Testdir) -> None:
     result.assert_outcomes(passed=1)
 
 
+def test_browser_type_launch_args_indirect_parametrization(
+    testdir: pytest.Testdir,
+) -> None:
+    # https://github.com/microsoft/playwright-pytest/issues/205
+    testdir.makepyfile(
+        """
+        import pytest
+
+        @pytest.mark.parametrize(
+            "browser_type_launch_args",
+            [{"args": ["--user-agent=CustomUA"]}],
+            indirect=True,
+        )
+        def test_custom(page):
+            assert page.evaluate("navigator.userAgent") == "CustomUA"
+
+        def test_default(page):
+            assert page.evaluate("navigator.userAgent") != "CustomUA"
+    """
+    )
+    result = testdir.runpytest("--browser", "chromium")
+    result.assert_outcomes(passed=2)
+
+
 def test_invalid_browser_channel(testdir: pytest.Testdir) -> None:
     testdir.makepyfile(
         """

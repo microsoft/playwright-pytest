@@ -214,7 +214,7 @@ VSCODE_PYTHON_EXTENSION_ID = "ms-python.python"
 
 
 @pytest.fixture(scope="session")
-def browser_type_launch_args(pytestconfig: Any) -> Dict:
+def browser_type_launch_args(pytestconfig: Any, request: pytest.FixtureRequest) -> Dict:
     launch_options = {}
     headed_option = pytestconfig.getoption("--headed")
     if headed_option:
@@ -232,6 +232,9 @@ def browser_type_launch_args(pytestconfig: Any) -> Dict:
     slowmo_option = pytestconfig.getoption("--slowmo")
     if slowmo_option:
         launch_options["slow_mo"] = slowmo_option
+    # Allow per-test launch options via
+    # @pytest.mark.parametrize("browser_type_launch_args", [{...}], indirect=True)
+    launch_options.update(getattr(request, "param", None) or {})
     return launch_options
 
 
