@@ -222,7 +222,11 @@ def browser_type_launch_args(pytestconfig: Any) -> Dict:
     headed_option = pytestconfig.getoption("--headed")
     if headed_option:
         launch_options["headless"] = False
-    elif VSCODE_PYTHON_EXTENSION_ID in sys.argv[0] and _is_debugger_attached():
+    elif (
+        VSCODE_PYTHON_EXTENSION_ID in sys.argv[0]
+        and _is_debugger_attached()
+        and _has_display()
+    ):
         # When the VSCode debugger is attached, then launch the browser headed by default
         launch_options["headless"] = False
     browser_channel_option = pytestconfig.getoption("--browser-channel")
@@ -232,6 +236,14 @@ def browser_type_launch_args(pytestconfig: Any) -> Dict:
     if slowmo_option:
         launch_options["slow_mo"] = slowmo_option
     return launch_options
+
+
+def _has_display() -> bool:
+    # Remote / WSL / CI Linux machines often have no display server; launching
+    # headed there fails, so only default to headed when a display is available.
+    if sys.platform != "linux":
+        return True
+    return bool(os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY"))
 
 
 def _is_debugger_attached() -> bool:

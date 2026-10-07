@@ -549,6 +549,40 @@ def test_headed(testdir: pytest.Testdir) -> None:
     result.assert_outcomes(passed=1)
 
 
+@pytest.mark.parametrize("display", [":99", ""])
+def test_vscode_debugger_launches_headed_only_with_display(
+    testdir: pytest.Testdir, monkeypatch: pytest.MonkeyPatch, display: str
+) -> None:
+    # https://github.com/microsoft/playwright-pytest/issues/122
+    if not display and sys.platform != "linux":
+        pytest.skip("display detection only applies to Linux")
+    monkeypatch.delenv("WAYLAND_DISPLAY", raising=False)
+    if display:
+        monkeypatch.setenv("DISPLAY", display)
+    else:
+        monkeypatch.delenv("DISPLAY", raising=False)
+    testdir.makeconftest(
+        """
+        import sys
+        import types
+
+        # Pretend to be launched by the VS Code Python extension with its debugger attached.
+        sys.argv[0] = "/home/user/.vscode/extensions/ms-python.python-2026.1.0/python_files/run_pytest_script.py"
+        sys.modules["pydevd"] = types.SimpleNamespace(
+            get_global_debugger=lambda: types.SimpleNamespace(is_attached=lambda: True)
+        )
+    """
+    )
+    testdir.makepyfile(
+        f"""
+        def test_launch_args(browser_type_launch_args):
+            assert browser_type_launch_args.get("headless") is {False if display else None}
+    """
+    )
+    result = testdir.runpytest()
+    result.assert_outcomes(passed=1)
+
+
 def test_invalid_browser_name(testdir: pytest.Testdir) -> None:
     testdir.makepyfile(
         """
