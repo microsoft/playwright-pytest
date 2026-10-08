@@ -16,6 +16,7 @@ import os
 import signal
 import subprocess
 import sys
+from typing import Optional
 
 import pytest
 
@@ -540,6 +541,53 @@ def test_headed(testdir: pytest.Testdir) -> None:
     """
     )
     result = testdir.runpytest("--browser", "chromium", "--headed")
+    result.assert_outcomes(passed=1)
+
+
+@pytest.mark.parametrize(
+    "display_env, args, headless",
+    [
+        pytest.param({"DISPLAY": ":99"}, [], False, id="x11"),
+        pytest.param({"WAYLAND_DISPLAY": "wayland-0"}, [], False, id="wayland"),
+        pytest.param({}, [], None, id="no-display"),
+        pytest.param({}, ["--headed"], False, id="no-display-headed"),
+    ],
+)
+def test_vscode_debugger_launches_headed_only_with_display(
+    testdir: pytest.Testdir,
+    monkeypatch: pytest.MonkeyPatch,
+    display_env: dict,
+    args: list,
+    headless: Optional[bool],
+) -> None:
+    # https://github.com/microsoft/playwright-pytest/issues/122
+    if not display_env and not args and sys.platform in ("darwin", "win32"):
+        pytest.skip("display detection only applies to Linux and other Unixes")
+    for name in ("DISPLAY", "WAYLAND_DISPLAY"):
+        monkeypatch.delenv(name, raising=False)
+    for name, value in display_env.items():
+        monkeypatch.setenv(name, value)
+    # A real debugger cannot attach to the pytester subprocess, so the conftest
+    # fakes the two signals the plugin checks: the VS Code launcher in argv[0]
+    # and an attached pydevd debugger.
+    testdir.makeconftest(
+        """
+        import sys
+        import types
+
+        sys.argv[0] = "/home/user/.vscode/extensions/ms-python.python-2026.1.0/python_files/run_pytest_script.py"
+        sys.modules["pydevd"] = types.SimpleNamespace(
+            get_global_debugger=lambda: types.SimpleNamespace(is_attached=lambda: True)
+        )
+    """
+    )
+    testdir.makepyfile(
+        f"""
+        def test_launch_args(browser_type_launch_args):
+            assert browser_type_launch_args.get("headless") is {headless!r}
+    """
+    )
+    result = testdir.runpytest(*args)
     result.assert_outcomes(passed=1)
 
 
