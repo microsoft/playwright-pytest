@@ -41,7 +41,7 @@ def _add_ini_asyncio(request: pytest.FixtureRequest, testdir: pytest.Testdir) ->
         ".ini",
         pytest="""
         [pytest]
-        addopts = -p no:playwright
+        addopts = -p no:playwright -p no:rerunfailures
         asyncio_default_test_loop_scope = session
         asyncio_default_fixture_loop_scope = session
     """,
@@ -1066,10 +1066,22 @@ def test_artifacts_are_kept_per_rerun_attempt(testdir: pytest.Testdir) -> None:
         async def test_flaky(page):
             global attempts
             attempts += 1
+            await page.set_content("<div>attempt " + str(attempts) + "</div>")
             assert attempts == 3
     """
     )
-    result = testdir.runpytest("--reruns", "2", "--tracing", "retain-on-failure")
+    result = testdir.runpytest(
+        "-p",
+        "rerunfailures",
+        "--reruns",
+        "2",
+        "--screenshot",
+        "on",
+        "--video",
+        "on",
+        "--tracing",
+        "retain-on-failure",
+    )
     result.assert_outcomes(passed=1)
     assert result.parseoutcomes()["rerun"] == 2
     test_results_dir = os.path.join(testdir.tmpdir, "test-results")
@@ -1077,9 +1089,16 @@ def test_artifacts_are_kept_per_rerun_attempt(testdir: pytest.Testdir) -> None:
         test_results_dir,
         """
 - test-artifacts-are-kept-per-rerun-attempt-py-test-flaky-chromium:
+  - test-failed-1.png
   - trace.zip
+  - video.webm
 - test-artifacts-are-kept-per-rerun-attempt-py-test-flaky-chromium-retry1:
+  - test-failed-1.png
   - trace.zip
+  - video.webm
+- test-artifacts-are-kept-per-rerun-attempt-py-test-flaky-chromium-retry2:
+  - test-finished-1.png
+  - video.webm
 """,
     )
 
