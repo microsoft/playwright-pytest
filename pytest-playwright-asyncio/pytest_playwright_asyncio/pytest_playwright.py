@@ -29,6 +29,7 @@ from typing import (
     Generator,
     List,
     Literal,
+    Mapping,
     Optional,
     Protocol,
     Sequence,
@@ -235,9 +236,17 @@ def browser_type_launch_args(pytestconfig: Any, request: pytest.FixtureRequest) 
     slowmo_option = pytestconfig.getoption("--slowmo")
     if slowmo_option:
         launch_options["slow_mo"] = slowmo_option
-    # Allow per-test launch options via
+    # Per-test launch options via
     # @pytest.mark.parametrize("browser_type_launch_args", [{...}], indirect=True)
-    launch_options.update(getattr(request, "param", None) or {})
+    # override the command line options above. The fixture is session scoped, so
+    # each distinct value launches its own browser.
+    if hasattr(request, "param"):
+        if not isinstance(request.param, Mapping):
+            raise pytest.UsageError(
+                "browser_type_launch_args expects a mapping of launch options, "
+                f"got {type(request.param).__name__}: {request.param!r}"
+            )
+        launch_options.update(request.param)
     return launch_options
 
 
