@@ -27,6 +27,7 @@ from typing import (
     Generator,
     List,
     Literal,
+    Mapping,
     Optional,
     Protocol,
     Sequence,
@@ -214,7 +215,7 @@ VSCODE_PYTHON_EXTENSION_ID = "ms-python.python"
 
 
 @pytest.fixture(scope="session")
-def browser_type_launch_args(pytestconfig: Any) -> Dict:
+def browser_type_launch_args(pytestconfig: Any, request: pytest.FixtureRequest) -> Dict:
     launch_options = {}
     headed_option = pytestconfig.getoption("--headed")
     if headed_option:
@@ -232,6 +233,17 @@ def browser_type_launch_args(pytestconfig: Any) -> Dict:
     slowmo_option = pytestconfig.getoption("--slowmo")
     if slowmo_option:
         launch_options["slow_mo"] = slowmo_option
+    # Per-test launch options via
+    # @pytest.mark.parametrize("browser_type_launch_args", [{...}], indirect=True)
+    # override the command line options above. The fixture is session scoped, so
+    # each distinct value launches its own browser.
+    if hasattr(request, "param"):
+        if not isinstance(request.param, Mapping):
+            raise pytest.UsageError(
+                "browser_type_launch_args expects a mapping of launch options, "
+                f"got {type(request.param).__name__}: {request.param!r}"
+            )
+        launch_options.update(request.param)
     return launch_options
 
 

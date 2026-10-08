@@ -146,6 +146,52 @@ def test_browser_channel(channel: str, testdir: pytest.Testdir) -> None:
     result.assert_outcomes(passed=1)
 
 
+def test_browser_type_launch_args_indirect_parametrization(
+    testdir: pytest.Testdir,
+) -> None:
+    # https://github.com/microsoft/playwright-pytest/issues/205
+    testdir.makepyfile(
+        """
+        import pytest
+
+        @pytest.mark.parametrize(
+            "browser_type_launch_args",
+            [{"args": ["--user-agent=UA1"]}, {"args": ["--user-agent=UA2"]}],
+            ids=["ua1", "ua2"],
+            indirect=True,
+        )
+        @pytest.mark.asyncio
+        async def test_custom(page, browser_type_launch_args):
+            user_agent = browser_type_launch_args["args"][0].split("=")[1]
+            assert await page.evaluate("navigator.userAgent") == user_agent
+
+        @pytest.mark.asyncio
+        async def test_default(page):
+            assert await page.evaluate("navigator.userAgent") not in ["UA1", "UA2"]
+    """
+    )
+    result = testdir.runpytest("--browser", "chromium")
+    result.assert_outcomes(passed=3)
+
+    testdir.makepyfile(
+        """
+        import pytest
+
+        @pytest.mark.parametrize("browser_type_launch_args", ["--headed"], indirect=True)
+        @pytest.mark.asyncio
+        async def test_invalid(page):
+            pass
+    """
+    )
+    result = testdir.runpytest("--browser", "chromium")
+    result.assert_outcomes(errors=1)
+    result.stdout.fnmatch_lines(
+        [
+            "*browser_type_launch_args expects a mapping of launch options, got str: '--headed'*"
+        ]
+    )
+
+
 def test_invalid_browser_channel(testdir: pytest.Testdir) -> None:
     testdir.makepyfile(
         """
