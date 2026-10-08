@@ -933,6 +933,114 @@ def test_artifacts_retain_on_failure(testdir: pytest.Testdir) -> None:
     )
 
 
+def test_artifacts_retain_on_failure_when_fixture_fails(
+    testdir: pytest.Testdir,
+) -> None:
+    # https://github.com/microsoft/playwright-pytest/issues/117
+    testdir.makepyfile(
+        """
+        import pytest
+
+        @pytest.fixture
+        def failing_setup(page):
+            page.goto("data:text/html,<div>setup</div>")
+            raise Exception("setup failed")
+
+        @pytest.fixture
+        def failing_teardown(page):
+            yield page
+            raise Exception("teardown failed")
+
+        @pytest.fixture
+        def skipping_setup(page):
+            page.goto("data:text/html,<div>skip</div>")
+            pytest.skip("skipped from a fixture")
+
+        def test_passing(page):
+            assert 2 == page.evaluate("1 + 1")
+
+        def test_setup_fails(failing_setup):
+            pass
+
+        def test_teardown_fails(failing_teardown):
+            failing_teardown.goto("data:text/html,<div>teardown</div>")
+
+        def test_setup_skips(skipping_setup):
+            pass
+    """
+    )
+    result = testdir.runpytest(
+        "--screenshot",
+        "only-on-failure",
+        "--video",
+        "retain-on-failure",
+        "--tracing",
+        "retain-on-failure",
+    )
+    result.assert_outcomes(passed=2, errors=2, skipped=1)
+    test_results_dir = os.path.join(testdir.tmpdir, "test-results")
+    # Nothing is kept for the skipped test.
+    _assert_folder_structure(
+        test_results_dir,
+        """
+- test-artifacts-retain-on-failure-when-fixture-fails-py-test-setup-fails-chromium:
+  - test-failed-1.png
+  - trace.zip
+  - video.webm
+- test-artifacts-retain-on-failure-when-fixture-fails-py-test-teardown-fails-chromium:
+  - test-failed-1.png
+  - trace.zip
+  - video.webm
+""",
+    )
+
+
+def test_artifact_errors_are_reported_as_teardown_errors(
+    testdir: pytest.Testdir,
+) -> None:
+    # Artifacts are moved to the output folder in pytest_runtest_makereport; an
+    # error there is reported for the test instead of aborting the session.
+    testdir.makeconftest(
+        """
+        import shutil
+
+        def _move(*args, **kwargs):
+            raise OSError("disk full")
+
+        shutil.move = _move
+    """
+    )
+    testdir.makepyfile(
+        """
+        import pytest
+
+        @pytest.fixture
+        def failing_teardown(page):
+            yield page
+            raise Exception("teardown failed")
+
+        def test_passing(page):
+            pass
+
+        def test_teardown_fails(failing_teardown):
+            pass
+    """
+    )
+    result = testdir.runpytest("--tracing", "on")
+    result.assert_outcomes(passed=2, errors=2)
+    result.stdout.fnmatch_lines(
+        [
+            "*ERROR at teardown of test_passing*",
+            "*OSError: disk full*",
+            # The fixture's error remains the main one.
+            "*ERROR at teardown of test_teardown_fails*",
+            "*Exception: teardown failed*",
+            "*Playwright artifacts error*",
+            "*OSError: disk full*",
+        ]
+    )
+
+
 def test_should_work_with_test_names_which_exceeds_256_characters(
     testdir: pytest.Testdir,
 ) -> None:
