@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import importlib.util
 import os
 import signal
 import subprocess
@@ -444,6 +445,77 @@ def test_base_url_via_fixture(
     )
     result = testdir.runpytest()
     result.assert_outcomes(passed=1)
+
+
+@pytest.mark.parametrize("source", ["option", "ini", "env", "none"])
+def test_base_url_without_pytest_base_url(
+    testdir: pytest.Testdir,
+    test_server: HTTPTestServer,
+    monkeypatch: pytest.MonkeyPatch,
+    source: str,
+) -> None:
+    # https://github.com/microsoft/playwright-pytest/issues/311
+    args = ["-p", "no:base_url"]
+    if source == "option":
+        args += ["--base-url", test_server.PREFIX]
+    elif source == "ini":
+        args += ["-o", f"base_url={test_server.PREFIX}"]
+    elif source == "env":
+        monkeypatch.setenv("PYTEST_BASE_URL", test_server.PREFIX)
+    expected = None if source == "none" else test_server.PREFIX
+    testdir.makepyfile(
+        f"""
+        import pytest
+
+        @pytest.mark.asyncio
+        async def test_base_url(page, base_url):
+            assert base_url == {expected!r}
+            await page.goto("{test_server.PREFIX}/foobar")
+            if base_url:
+                await page.goto("/foobar")
+                assert page.url == "{test_server.PREFIX}/foobar"
+    """
+    )
+    result = testdir.runpytest(*args)
+    result.assert_outcomes(passed=1)
+
+
+def test_base_url_without_plugin_autoload(
+    testdir: pytest.Testdir,
+    test_server: HTTPTestServer,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Only plugins that are actually loaded count, not installed ones.
+    monkeypatch.setenv("PYTEST_DISABLE_PLUGIN_AUTOLOAD", "1")
+    testdir.makepyfile(
+        f"""
+        import pytest
+
+        @pytest.mark.asyncio
+        async def test_base_url(page, base_url):
+            assert base_url == "{test_server.PREFIX}"
+            await page.goto("/foobar")
+            assert page.url == "{test_server.PREFIX}/foobar"
+    """
+    )
+    playwright_plugin = [
+        "-p",
+        "pytest_playwright_asyncio.pytest_playwright",
+        "-p",
+        "pytest_asyncio.plugin",
+    ]
+    plugin_sets = [playwright_plugin]
+    if importlib.util.find_spec("pytest_base_url") is not None:
+        # Loaded explicitly, in either order and under either name, pytest-base-url
+        # provides the option instead.
+        plugin_sets += [
+            playwright_plugin + ["-p", "base_url"],
+            ["-p", "base_url"] + playwright_plugin,
+            playwright_plugin + ["-p", "pytest_base_url.plugin"],
+        ]
+    for plugins in plugin_sets:
+        result = testdir.runpytest(*plugins, "--base-url", test_server.PREFIX)
+        result.assert_outcomes(passed=1)
 
 
 def test_skip_browsers(testdir: pytest.Testdir) -> None:
