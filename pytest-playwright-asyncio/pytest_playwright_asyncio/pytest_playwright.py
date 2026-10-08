@@ -186,6 +186,8 @@ def pytest_configure(config: Any) -> None:
 
 # Set on a test item by _artifacts_recorder, picked up for the teardown report.
 _ARTIFACTS_RECORDER_ATTR = "_playwright_artifacts_recorder"
+# Node id of the test being set up, run or torn down, see _APIRequestContexts.
+_CURRENT_TEST_NODEID_KEY = pytest.StashKey[str]()
 
 
 # Making test result information available in fixtures
@@ -324,6 +326,7 @@ def _get_skiplist(item: Any, values: List[str], value_name: str) -> List[str]:
 
 
 def pytest_runtest_setup(item: Any) -> None:
+    item.config.stash[_CURRENT_TEST_NODEID_KEY] = item.nodeid
     if not hasattr(item, "callspec"):
         return
     browser_name = item.callspec.params.get("browser_name")
@@ -478,7 +481,7 @@ def _pw_trace_api_requests(request: pytest.FixtureRequest) -> None:
 def _pw_api_request_contexts(pytestconfig: Any) -> Optional["_APIRequestContexts"]:
     if pytestconfig.getoption("--tracing") == "off":
         return None
-    return _APIRequestContexts()
+    return _APIRequestContexts(pytestconfig)
 
 
 @pytest_asyncio.fixture(scope="session")
@@ -856,6 +859,8 @@ class ArtifactsRecorder:
         self._all_pages: List[Page] = []
         self._screenshots: List[str] = []
         self._traces: List[str] = []
+        # API request contexts that existed before this test, see start_api_request_tracing.
+        self._shared_api_request_contexts: Set[APIRequestContext] = set()
         # (temporary path, file name in the output folder)
         self._videos: List[Tuple[str, str]] = []
         self.finished = False
@@ -983,6 +988,10 @@ class ArtifactsRecorder:
         if contexts is None:
             return
         contexts.recorder = self
+        # Contexts from before this test, e.g. session-scoped ones: their trace is
+        # only kept when the test used them. Contexts the test creates itself keep
+        # their trace, like browser contexts do.
+        self._shared_api_request_contexts = set(contexts.live)
         for context in contexts.live:
             if context not in contexts.tracing_chunk:
                 await context.tracing.start_chunk(
@@ -1004,14 +1013,15 @@ class ArtifactsRecorder:
         contexts = self._api_request_contexts
         if contexts is None or context not in contexts.tracing_chunk:
             return
+        # Forgotten first: should stop_chunk fail (the error is reported like one
+        # from a browser context), the next start_chunk discards what is still
+        # being recorded.
         contexts.tracing_chunk.discard(context)
         trace_path = Path(self._pw_artifacts_folder.name) / _create_guid()
-        try:
-            await context.tracing.stop_chunk(path=trace_path)
-        except Error:
-            return
-        if not _trace_has_actions(trace_path):
-            # A long-lived context (e.g. session-scoped) the test did not use.
+        await context.tracing.stop_chunk(path=trace_path)
+        if context in self._shared_api_request_contexts and not _trace_has_actions(
+            trace_path
+        ):
             os.remove(trace_path)
             return
         self._traces.append(str(trace_path))
@@ -1021,7 +1031,8 @@ class _APIRequestContexts:
     # Tracks contexts created via playwright.request.new_context() so that, like
     # browser contexts, their traces are recorded per test.
 
-    def __init__(self) -> None:
+    def __init__(self, config: Any) -> None:
+        self._config = config
         self.live: List[APIRequestContext] = []
         # Contexts with a trace chunk in progress.
         self.tracing_chunk: Set[APIRequestContext] = set()
@@ -1029,6 +1040,8 @@ class _APIRequestContexts:
         self.recorder: Optional[ArtifactsRecorder] = None
 
     def instrument(self, playwright: Playwright) -> None:
+        # playwright.request is one APIRequest instance for the lifetime of the
+        # Playwright object, so wrapping its method here covers all contexts.
         original_new_context = playwright.request.new_context
 
         async def _new_context(*args: Any, **kwargs: Any) -> APIRequestContext:
@@ -1041,13 +1054,25 @@ class _APIRequestContexts:
             async def _dispose_wrapper(*args: Any, **kwargs: Any) -> None:
                 if context in self.live:
                     self.live.remove(context)
-                if self.recorder is not None:
-                    await self.recorder.on_will_dispose_api_request_context(context)
-                self.tracing_chunk.discard(context)
-                await original_dispose(*args, **kwargs)
+                try:
+                    if self.recorder is not None:
+                        await self.recorder.on_will_dispose_api_request_context(context)
+                    self.tracing_chunk.discard(context)
+                finally:
+                    # Dispose even if saving the trace failed; that error still
+                    # propagates.
+                    await original_dispose(*args, **kwargs)
 
             context.dispose = _dispose_wrapper
-            await context.tracing.start(screenshots=True, snapshots=True, sources=True)
+            # Contexts are usually created by fixtures, before the artifacts
+            # recorder of the test exists, so the title comes from the hook.
+            nodeid = self._config.stash.get(_CURRENT_TEST_NODEID_KEY, None)
+            await context.tracing.start(
+                title=slugify(nodeid) if nodeid else None,
+                screenshots=True,
+                snapshots=True,
+                sources=True,
+            )
             self.live.append(context)
             self.tracing_chunk.add(context)
             return context
@@ -1056,13 +1081,19 @@ class _APIRequestContexts:
 
 
 def _trace_has_actions(trace_path: Path) -> bool:
+    # Looks for an action ("before" event) in the trace. The format (one JSON
+    # event per line in *.trace) is Playwright's own and may change, in which
+    # case, or on any error, the trace is kept.
     try:
         with zipfile.ZipFile(trace_path) as trace:
-            return any(
-                b'"type":"before"' in trace.read(name)
-                for name in trace.namelist()
-                if name.endswith(".trace")
-            )
+            for name in trace.namelist():
+                if not name.endswith(".trace"):
+                    continue
+                with trace.open(name) as events:
+                    for event in events:
+                        if b'"type":"before"' in event:
+                            return True
+        return False
     except (OSError, zipfile.BadZipFile):
         return True
 

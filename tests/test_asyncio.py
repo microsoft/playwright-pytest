@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import importlib.util
+import json
 import os
 import signal
 import subprocess
@@ -1285,6 +1286,20 @@ def test_traces_api_request_contexts(
             await function_api_request_context.get("/three")
 
         @pytest.mark.asyncio
+        async def test_unused_function_context(function_api_request_context):
+            pass
+
+        @pytest.mark.asyncio
+        async def test_page_and_api_context(page, api_request_context):
+            await page.set_content("<div>hello</div>")
+            await api_request_context.get("/five")
+
+        @pytest.mark.asyncio
+        async def test_instrumented_only_with_tracing(playwright, pytestconfig):
+            instrumented = playwright.request.new_context.__name__ != "new_context"
+            assert instrumented == (pytestconfig.getoption("--tracing") != "off")
+
+        @pytest.mark.asyncio
         async def test_failing(api_request_context):
             await api_request_context.get("/four")
             raise Exception("Failed")
@@ -1348,16 +1363,47 @@ def _assert_api_request_traces(testdir: pytest.Testdir) -> None:
     prefix = os.path.join(test_results_dir, "test-traces-api-request-contexts-py-test-")
 
     result = testdir.runpytest("--tracing", "on")
-    result.assert_outcomes(passed=3, failed=1)
+    result.assert_outcomes(passed=6, failed=1)
+    _assert_folder_structure(
+        test_results_dir,
+        """
+- test-traces-api-request-contexts-py-test-failing:
+  - trace.zip
+- test-traces-api-request-contexts-py-test-function-context:
+  - trace.zip
+- test-traces-api-request-contexts-py-test-page-and-api-context-chromium:
+  - trace-1.zip
+  - trace-2.zip
+- test-traces-api-request-contexts-py-test-session-context-1:
+  - trace.zip
+- test-traces-api-request-contexts-py-test-session-context-2:
+  - trace.zip
+- test-traces-api-request-contexts-py-test-unused-function-context:
+  - trace.zip
+""",
+    )
     # Each test gets a trace with only its own requests, including tests that
-    # share a session-scoped context.
-    assert _trace_request_urls(prefix + "session-context-1/trace.zip") == ["/one"]
-    assert _trace_request_urls(prefix + "session-context-2/trace.zip") == ["/two"]
-    assert _trace_request_urls(prefix + "function-context/trace.zip") == ["/three"]
-    assert _trace_request_urls(prefix + "failing/trace.zip") == ["/four"]
+    # share a session-scoped context, and every trace is titled after its test.
+    for name, urls in [
+        ("session-context-1", ["/one"]),
+        ("session-context-2", ["/two"]),
+        ("function-context", ["/three"]),
+        ("failing", ["/four"]),
+        # A context the test created but did not use keeps its trace.
+        ("unused-function-context", []),
+    ]:
+        assert _trace_request_urls(prefix + name + "/trace.zip") == urls
+        assert _trace_title(prefix + name + "/trace.zip") == os.path.basename(
+            prefix + name
+        )
+    # Browser trace first, then the API trace.
+    folder = prefix + "page-and-api-context-chromium/"
+    assert _trace_request_urls(folder + "trace-2.zip") == ["/five"]
+    assert _trace_title(folder + "trace-1.zip") == _trace_title(folder + "trace-2.zip")
+    assert _trace_title(folder + "trace-1.zip") == os.path.basename(folder[:-1])
 
     result = testdir.runpytest("--tracing", "retain-on-failure")
-    result.assert_outcomes(passed=3, failed=1)
+    result.assert_outcomes(passed=6, failed=1)
     _assert_folder_structure(
         test_results_dir,
         """
@@ -1366,11 +1412,30 @@ def _assert_api_request_traces(testdir: pytest.Testdir) -> None:
 """,
     )
 
+    result = testdir.runpytest()
+    result.assert_outcomes(passed=6, failed=1)
+    assert not os.path.exists(test_results_dir)
+
+
+def _trace_events(trace_path: str) -> list:
+    with zipfile.ZipFile(trace_path) as trace:
+        return [json.loads(line) for line in trace.read("trace.trace").splitlines()]
+
 
 def _trace_request_urls(trace_path: str) -> list:
-    with zipfile.ZipFile(trace_path) as trace:
-        events = [json.loads(line) for line in trace.read("trace.trace").splitlines()]
-    return [event["params"]["url"] for event in events if event["type"] == "before"]
+    return [
+        event["params"]["url"]
+        for event in _trace_events(trace_path)
+        if event["type"] == "before"
+    ]
+
+
+def _trace_title(trace_path: str) -> str:
+    return next(
+        event["title"]
+        for event in _trace_events(trace_path)
+        if event["type"] == "context-options"
+    )
 
 
 def test_is_able_to_set_expect_timeout_via_conftest(testdir: pytest.Testdir) -> None:
