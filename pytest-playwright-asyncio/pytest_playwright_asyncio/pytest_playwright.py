@@ -240,8 +240,10 @@ def browser_type_launch_args(pytestconfig: Any) -> Dict:
 
 def _has_display() -> bool:
     # Remote / WSL / CI Linux machines often have no display server; launching
-    # headed there fails, so only default to headed when a display is available.
-    if sys.platform != "linux":
+    # headed there fails, so only default to headed when a display is configured.
+    # macOS and Windows always have one; elsewhere this checks the environment
+    # variables, not that the display server is reachable.
+    if sys.platform in ("darwin", "win32"):
         return True
     return bool(os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY"))
 
