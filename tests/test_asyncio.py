@@ -12,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import html
-import json
 import os
 import signal
 import subprocess
@@ -44,7 +42,7 @@ def _add_ini_asyncio(request: pytest.FixtureRequest, testdir: pytest.Testdir) ->
         ".ini",
         pytest="""
         [pytest]
-        addopts = -p no:playwright -p no:rerunfailures
+        addopts = -p no:playwright -p no:rerunfailures -p no:html
         asyncio_default_test_loop_scope = session
         asyncio_default_fixture_loop_scope = session
     """,
@@ -1113,40 +1111,67 @@ def test_artifacts_are_attached_to_reports(testdir: pytest.Testdir) -> None:
         import pytest
 
         @pytest.mark.asyncio
-        async def test_failing(page):
+        async def test_passing(page):
             await page.set_content("<div>hello</div>")
+
+        @pytest.mark.asyncio
+        async def test_failing(page, new_context):
+            await page.set_content("<div>hello</div>")
+            second_page = await (await new_context()).new_page()
+            await second_page.set_content("<div>second</div>")
             raise Exception("Failed")
     """
     )
-    result = testdir.runpytest(
+    options = [
         "--screenshot",
-        "on",
+        "only-on-failure",
         "--video",
-        "on",
+        "retain-on-failure",
         "--tracing",
-        "on",
-        "--junitxml",
-        "junit.xml",
-        "--html",
-        os.path.join("report", "index.html"),
-    )
-    result.assert_outcomes(failed=1)
+        "retain-on-failure",
+    ]
     folder_name = "test-artifacts-are-attached-to-reports-py-test-failing-chromium"
-    folder = testdir.tmpdir.join("test-results", folder_name)
+    # The failing test has two contexts, so two artifacts of each kind.
+    files = [
+        ("screenshot", "test-failed-1.png"),
+        ("screenshot", "test-failed-2.png"),
+        ("trace", "trace-1.zip"),
+        ("trace", "trace-2.zip"),
+        ("video", "video-1.webm"),
+        ("video", "video-2.webm"),
+    ]
+
+    # JUnit XML: a property per artifact, relative to the invocation directory.
+    result = testdir.runpytest(*options, "--junitxml", "junit.xml")
+    result.assert_outcomes(passed=1, failed=1)
     junit = ElementTree.parse(str(testdir.tmpdir.join("junit.xml")))
-    properties = {
-        prop.get("name"): prop.get("value") for prop in junit.iter("property")
-    }
-    assert properties == {
-        "playwright_screenshot": folder.join("test-failed-1.png").strpath,
-        "playwright_trace": folder.join("trace.zip").strpath,
-        "playwright_video": folder.join("video.webm").strpath,
-    }
-    report = testdir.tmpdir.join("report", "index.html").read()
-    trace_link = os.path.join("..", "test-results", folder_name, "trace.zip")
-    assert html.escape(json.dumps(trace_link)[1:-1]) in report
+    properties = [
+        (prop.get("name"), prop.get("value")) for prop in junit.iter("property")
+    ]
+    assert properties == [
+        (f"playwright_{kind}", os.path.join("test-results", folder_name, name))
+        for kind, name in files
+    ]
+
+    # pytest-html: linked relative to the report, nothing copied into its assets.
+    html_report = os.path.join("report", "index.html")
+    result = testdir.runpytest(*options, "-p", "html", "--html", html_report)
+    result.assert_outcomes(passed=1, failed=1)
+    report = testdir.tmpdir.join(html_report).read()
+    for _, name in files:
+        assert f"../test-results/{folder_name}/{name}" in report
     assets = testdir.tmpdir.join("report", "assets").listdir()
-    assert sorted(p.ext for p in assets if p.ext != ".css") == [".png", ".webm"]
+    assert [asset.basename for asset in assets] == ["style.css"]
+
+    # A self-contained report embeds screenshots and videos.
+    result = testdir.runpytest(
+        *options, "-p", "html", "--html", html_report, "--self-contained-html"
+    )
+    result.assert_outcomes(passed=1, failed=1)
+    report = testdir.tmpdir.join(html_report).read()
+    assert f"../test-results/{folder_name}/trace-1.zip" in report
+    assert "data:image/png;base64," in report
+    assert "data:video/webm;base64," in report
 
 
 def test_should_work_with_test_names_which_exceeds_256_characters(

@@ -66,6 +66,7 @@ from playwright.sync_api import (
 from slugify import slugify
 import tempfile
 import traceback
+import urllib.parse
 
 
 @pytest.fixture(scope="session")
@@ -238,28 +239,47 @@ def _test_failed_before_teardown(item: Any) -> bool:
 def _attach_artifacts_to_report(
     item: Any, report: Any, artifacts: List[Tuple[str, str]]
 ) -> None:
-    # Expose the kept artifacts to reporters; JUnit XML writes these as
-    # <property> elements, and conftest hooks can read them from the report.
+    # Expose the kept artifacts to reporters. JUnit XML writes them as <property>
+    # elements, one per artifact (so a name repeats for a test with e.g. several
+    # contexts, like record_property() would), and pytest_runtest_logreport
+    # hooks see them on the teardown report.
+    config = item.config
     for kind, path in artifacts:
-        report.user_properties.append((f"playwright_{kind}", path))
+        report.user_properties.append(
+            (f"playwright_{kind}", _path_for_report(config, path))
+        )
 
-    pytest_html = item.config.pluginmanager.getplugin("html")
-    html_path = getattr(item.config.option, "htmlpath", None)
+    pytest_html = config.pluginmanager.getplugin("html")
+    html_path = getattr(config.option, "htmlpath", None)
     if not artifacts or pytest_html is None or not html_path:
         return
-    html_dir = os.path.dirname(os.path.abspath(html_path))
+    # pytest-html (>= 4) resolves --html like this, against the directory pytest
+    # was started from.
+    html_dir = Path(
+        config.invocation_params.dir, Path(os.path.expandvars(html_path)).expanduser()
+    ).parent
+
+    def link(path: str) -> str:
+        try:
+            relative = os.path.relpath(path, html_dir)
+        except ValueError:
+            # Another drive on Windows, no relative link is possible.
+            return Path(path).as_uri()
+        return urllib.parse.quote(Path(relative).as_posix())
+
+    self_contained = config.getoption("self_contained_html", default=False)
     extras = getattr(report, "extras", [])
     for kind, path in artifacts:
         if kind == "trace":
-            try:
-                link = os.path.relpath(path, html_dir)
-            except ValueError:
-                # Different drive on Windows.
-                link = path
-            extras.append(pytest_html.extras.url(link, name="Trace"))
+            extras.append(pytest_html.extras.url(link(path), name="Trace"))
             continue
-        with open(path, "rb") as f:
-            content = base64.b64encode(f.read()).decode()
+        if self_contained:
+            with open(path, "rb") as f:
+                content = base64.b64encode(f.read()).decode()
+        else:
+            # Linked rather than embedded, so the report does not copy the file
+            # into its assets folder.
+            content = link(path)
         if kind == "screenshot":
             extras.append(pytest_html.extras.png(content, name="Screenshot"))
         elif kind == "video":
@@ -269,6 +289,16 @@ def _attach_artifacts_to_report(
                 )
             )
     report.extras = extras
+
+
+def _path_for_report(config: Any, path: str) -> str:
+    # Relative to the directory pytest was started from when the artifact is
+    # inside it, so the path stays valid wherever the report is processed;
+    # absolute otherwise.
+    try:
+        return str(Path(path).relative_to(config.invocation_params.dir))
+    except ValueError:
+        return path
 
 
 def _get_skiplist(item: Any, values: List[str], value_name: str) -> List[str]:
