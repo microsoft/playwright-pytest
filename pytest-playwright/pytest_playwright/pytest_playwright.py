@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import base64
 import hashlib
 import json
 import secrets
@@ -65,6 +66,7 @@ from playwright.sync_api import (
 from slugify import slugify
 import tempfile
 import traceback
+import urllib.parse
 
 
 @pytest.fixture(scope="session")
@@ -176,8 +178,7 @@ def pytest_configure(config: Any) -> None:
             )
 
 
-# Set on a test item when keeping or discarding its artifacts has to wait for
-# the teardown report, see _artifacts_recorder.
+# Set on a test item by _artifacts_recorder, picked up for the teardown report.
 _ARTIFACTS_RECORDER_ATTR = "_playwright_artifacts_recorder"
 
 
@@ -209,7 +210,8 @@ def pytest_runtest_makereport(item: Any) -> Generator[None, Any, None]:
         if artifacts_recorder is not None:
             delattr(item, _ARTIFACTS_RECORDER_ATTR)
             try:
-                artifacts_recorder.did_finish_test(rep.failed)
+                if not artifacts_recorder.finished:
+                    artifacts_recorder.did_finish_test(rep.failed)
             except Exception:
                 # Report it as a teardown error of this test instead of letting it
                 # escape the hook as an INTERNALERROR that aborts the session. A
@@ -220,6 +222,7 @@ def pytest_runtest_makereport(item: Any) -> Generator[None, Any, None]:
                 else:
                     rep.outcome = "failed"
                     rep.longrepr = error
+            _attach_artifacts_to_report(item, rep, artifacts_recorder.artifacts)
 
 
 def _test_failed_before_teardown(item: Any) -> bool:
@@ -231,6 +234,71 @@ def _test_failed_before_teardown(item: Any) -> bool:
     # artifacts have to be kept right away).
     rep_setup = getattr(item, "rep_setup", None)
     return rep_setup is None or not rep_setup.skipped
+
+
+def _attach_artifacts_to_report(
+    item: Any, report: Any, artifacts: List[Tuple[str, str]]
+) -> None:
+    # Expose the kept artifacts to reporters. JUnit XML writes them as <property>
+    # elements, one per artifact (so a name repeats for a test with e.g. several
+    # contexts, like record_property() would), and pytest_runtest_logreport
+    # hooks see them on the teardown report.
+    config = item.config
+    for kind, path in artifacts:
+        report.user_properties.append(
+            (f"playwright_{kind}", _path_for_report(config, path))
+        )
+
+    pytest_html = config.pluginmanager.getplugin("html")
+    html_path = getattr(config.option, "htmlpath", None)
+    if not artifacts or pytest_html is None or not html_path:
+        return
+    # pytest-html (>= 4) resolves --html like this, against the directory pytest
+    # was started from.
+    html_dir = Path(
+        config.invocation_params.dir, Path(os.path.expandvars(html_path)).expanduser()
+    ).parent
+
+    def link(path: str) -> str:
+        try:
+            relative = os.path.relpath(path, html_dir)
+        except ValueError:
+            # Another drive on Windows, no relative link is possible.
+            return Path(path).as_uri()
+        return urllib.parse.quote(Path(relative).as_posix())
+
+    self_contained = config.getoption("self_contained_html", default=False)
+    extras = getattr(report, "extras", [])
+    for kind, path in artifacts:
+        if kind == "trace":
+            extras.append(pytest_html.extras.url(link(path), name="Trace"))
+            continue
+        if self_contained:
+            with open(path, "rb") as f:
+                content = base64.b64encode(f.read()).decode()
+        else:
+            # Linked rather than embedded, so the report does not copy the file
+            # into its assets folder.
+            content = link(path)
+        if kind == "screenshot":
+            extras.append(pytest_html.extras.png(content, name="Screenshot"))
+        elif kind == "video":
+            extras.append(
+                pytest_html.extras.video(
+                    content, name="Video", mime_type="video/webm", extension="webm"
+                )
+            )
+    report.extras = extras
+
+
+def _path_for_report(config: Any, path: str) -> str:
+    # Relative to the directory pytest was started from when the artifact is
+    # inside it, so the path stays valid wherever the report is processed;
+    # absolute otherwise.
+    try:
+        return str(Path(path).relative_to(config.invocation_params.dir))
+    except ValueError:
+        return path
 
 
 def _get_skiplist(item: Any, values: List[str], value_name: str) -> List[str]:
@@ -375,11 +443,10 @@ def _artifacts_recorder(
     artifacts_recorder.collect_videos()
     if _test_failed_before_teardown(request.node):
         artifacts_recorder.did_finish_test(failed=True)
-    else:
-        # Fixtures torn down after this one (e.g. a user fixture that uses `page`)
-        # can still fail the test, so decide in pytest_runtest_makereport once
-        # the teardown report exists.
-        setattr(request.node, _ARTIFACTS_RECORDER_ATTR, artifacts_recorder)
+    # Otherwise fixtures torn down after this one (e.g. a user fixture that uses
+    # `page`) can still fail the test, so pytest_runtest_makereport decides once
+    # the teardown report exists. It also attaches the artifacts to that report.
+    setattr(request.node, _ARTIFACTS_RECORDER_ATTR, artifacts_recorder)
 
 
 @pytest.fixture(scope="session")
@@ -712,6 +779,9 @@ class ArtifactsRecorder:
         self._traces: List[str] = []
         # (temporary path, file name in the output folder)
         self._videos: List[Tuple[str, str]] = []
+        self.finished = False
+        # (kind, path) of the artifacts kept in the output folder
+        self.artifacts: List[Tuple[str, str]] = []
         self._tracing_option = pytestconfig.getoption("--tracing")
         self._capture_trace = self._tracing_option in ["on", "retain-on-failure"]
 
@@ -722,6 +792,7 @@ class ArtifactsRecorder:
         )
 
     def did_finish_test(self, failed: bool) -> None:
+        self.finished = True
         screenshot_option = self._pytestconfig.getoption("--screenshot")
         capture_screenshot = screenshot_option == "on" or (
             failed and screenshot_option == "only-on-failure"
@@ -734,6 +805,7 @@ class ArtifactsRecorder:
                 )
                 os.makedirs(os.path.dirname(screenshot_path), exist_ok=True)
                 shutil.move(screenshot, screenshot_path)
+                self.artifacts.append(("screenshot", screenshot_path))
         else:
             for screenshot in self._screenshots:
                 os.remove(screenshot)
@@ -748,6 +820,7 @@ class ArtifactsRecorder:
                 trace_path = self._build_artifact_test_folder(trace_file_name)
                 os.makedirs(os.path.dirname(trace_path), exist_ok=True)
                 shutil.move(trace, trace_path)
+                self.artifacts.append(("trace", trace_path))
         else:
             for trace in self._traces:
                 os.remove(trace)
@@ -761,6 +834,7 @@ class ArtifactsRecorder:
                 video_path = self._build_artifact_test_folder(video_file_name)
                 os.makedirs(os.path.dirname(video_path), exist_ok=True)
                 shutil.move(video, video_path)
+                self.artifacts.append(("video", video_path))
             else:
                 os.remove(video)
 
