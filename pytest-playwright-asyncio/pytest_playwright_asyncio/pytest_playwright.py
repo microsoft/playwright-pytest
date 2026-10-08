@@ -181,12 +181,17 @@ def pytest_configure(config: Any) -> None:
 
 # Set on a test item when keeping or discarding its artifacts has to wait for
 # the teardown report, see _artifacts_recorder.
-_PENDING_ARTIFACTS_RECORDER_ATTR = "_playwright_pending_artifacts_recorder"
+_ARTIFACTS_RECORDER_ATTR = "_playwright_artifacts_recorder"
 
 
 # Making test result information available in fixtures
 # https://docs.pytest.org/en/latest/example/simple.html#making-test-result-information-available-in-fixtures
-@pytest.hookimpl(tryfirst=True, hookwrapper=True)
+#
+# trylast: the code after `yield` of a trylast wrapper runs before that of the
+# other wrappers, so pytest_runtest_makereport hooks in conftest.py and in other
+# plugins see the teardown outcome set below. (A tryfirst wrapper elsewhere that
+# changes rep.outcome after this point is not taken into account.)
+@pytest.hookimpl(trylast=True, hookwrapper=True)
 def pytest_runtest_makereport(item: Any) -> Generator[None, Any, None]:
     # execute all other hooks to obtain the report object
     outcome = yield
@@ -198,16 +203,32 @@ def pytest_runtest_makereport(item: Any) -> Generator[None, Any, None]:
     setattr(item, "rep_" + rep.when, rep)
 
     if rep.when == "teardown":
-        artifacts_recorder = getattr(item, _PENDING_ARTIFACTS_RECORDER_ATTR, None)
+        artifacts_recorder = getattr(item, _ARTIFACTS_RECORDER_ATTR, None)
         if artifacts_recorder is not None:
-            delattr(item, _PENDING_ARTIFACTS_RECORDER_ATTR)
+            delattr(item, _ARTIFACTS_RECORDER_ATTR)
             try:
                 artifacts_recorder.did_finish_test(rep.failed)
             except Exception:
                 # Report it as a teardown error of this test instead of letting it
-                # escape the hook as an INTERNALERROR that aborts the session.
-                rep.outcome = "failed"
-                rep.longrepr = traceback.format_exc()
+                # escape the hook as an INTERNALERROR that aborts the session. A
+                # fixture's own teardown error stays the main one.
+                error = traceback.format_exc()
+                if rep.failed:
+                    rep.sections.append(("Playwright artifacts error", error))
+                else:
+                    rep.outcome = "failed"
+                    rep.longrepr = error
+
+
+def _test_failed_before_teardown(item: Any) -> bool:
+    rep_call = getattr(item, "rep_call", None)
+    if rep_call is not None:
+        return rep_call.failed
+    # No call report: the setup failed, the test was skipped from a fixture, or
+    # the run was interrupted (then there is no teardown report either, so the
+    # artifacts have to be kept right away).
+    rep_setup = getattr(item, "rep_setup", None)
+    return rep_setup is None or not rep_setup.skipped
 
 
 def _get_skiplist(item: Any, values: List[str], value_name: str) -> List[str]:
@@ -344,16 +365,13 @@ async def _artifacts_recorder(
     )
     yield artifacts_recorder
     await artifacts_recorder.collect_videos()
-    # If request.node is missing rep_call, then some error happened during execution
-    # that prevented teardown, but should still be counted as a failure
-    failed = request.node.rep_call.failed if hasattr(request.node, "rep_call") else True
-    if failed:
-        artifacts_recorder.did_finish_test(failed)
+    if _test_failed_before_teardown(request.node):
+        artifacts_recorder.did_finish_test(failed=True)
     else:
         # Fixtures torn down after this one (e.g. a user fixture that uses `page`)
         # can still fail the test, so decide in pytest_runtest_makereport once
         # the teardown report exists.
-        setattr(request.node, _PENDING_ARTIFACTS_RECORDER_ATTR, artifacts_recorder)
+        setattr(request.node, _ARTIFACTS_RECORDER_ATTR, artifacts_recorder)
 
 
 @pytest_asyncio.fixture(scope="session")
@@ -750,7 +768,6 @@ class ArtifactsRecorder:
                     continue
                 video_path = Path(self._pw_artifacts_folder.name) / _create_guid()
                 await video.save_as(path=video_path)
-                await video.delete()
             except Error:
                 # Silent catch empty videos.
                 continue
@@ -758,6 +775,11 @@ class ArtifactsRecorder:
                 "video.webm" if len(self._all_pages) == 1 else f"video-{index + 1}.webm"
             )
             self._videos.append((str(video_path), video_file_name))
+            try:
+                await video.delete()
+            except Error:
+                # The copy is what gets kept; removing Playwright's file is best effort.
+                pass
 
     async def on_did_create_browser_context(self, context: BrowserContext) -> None:
         context.on("page", lambda page: self._all_pages.append(page))

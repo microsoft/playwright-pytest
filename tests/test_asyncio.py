@@ -957,6 +957,11 @@ def test_artifacts_retain_on_failure_when_fixture_fails(
             yield page
             raise Exception("teardown failed")
 
+        @pytest_asyncio.fixture
+        async def skipping_setup(page):
+            await page.goto("data:text/html,<div>skip</div>")
+            pytest.skip("skipped from a fixture")
+
         @pytest.mark.asyncio
         async def test_passing(page):
             assert 2 == await page.evaluate("1 + 1")
@@ -968,6 +973,10 @@ def test_artifacts_retain_on_failure_when_fixture_fails(
         @pytest.mark.asyncio
         async def test_teardown_fails(failing_teardown):
             await failing_teardown.goto("data:text/html,<div>teardown</div>")
+
+        @pytest.mark.asyncio
+        async def test_setup_skips(skipping_setup):
+            pass
     """
     )
     result = testdir.runpytest(
@@ -978,8 +987,9 @@ def test_artifacts_retain_on_failure_when_fixture_fails(
         "--tracing",
         "retain-on-failure",
     )
-    result.assert_outcomes(passed=2, errors=2)
+    result.assert_outcomes(passed=2, errors=2, skipped=1)
     test_results_dir = os.path.join(testdir.tmpdir, "test-results")
+    # Nothing is kept for the skipped test.
     _assert_folder_structure(
         test_results_dir,
         """
@@ -992,6 +1002,55 @@ def test_artifacts_retain_on_failure_when_fixture_fails(
   - trace.zip
   - video.webm
 """,
+    )
+
+
+def test_artifact_errors_are_reported_as_teardown_errors(
+    testdir: pytest.Testdir,
+) -> None:
+    # Artifacts are moved to the output folder in pytest_runtest_makereport; an
+    # error there is reported for the test instead of aborting the session.
+    testdir.makeconftest(
+        """
+        import shutil
+
+        def _move(*args, **kwargs):
+            raise OSError("disk full")
+
+        shutil.move = _move
+    """
+    )
+    testdir.makepyfile(
+        """
+        import pytest
+        import pytest_asyncio
+
+        @pytest_asyncio.fixture
+        async def failing_teardown(page):
+            yield page
+            raise Exception("teardown failed")
+
+        @pytest.mark.asyncio
+        async def test_passing(page):
+            pass
+
+        @pytest.mark.asyncio
+        async def test_teardown_fails(failing_teardown):
+            pass
+    """
+    )
+    result = testdir.runpytest("--tracing", "on")
+    result.assert_outcomes(passed=2, errors=2)
+    result.stdout.fnmatch_lines(
+        [
+            "*ERROR at teardown of test_passing*",
+            "*OSError: disk full*",
+            # The fixture's error remains the main one.
+            "*ERROR at teardown of test_teardown_fails*",
+            "*Exception: teardown failed*",
+            "*Playwright artifacts error*",
+            "*OSError: disk full*",
+        ]
     )
 
 
