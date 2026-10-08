@@ -14,7 +14,6 @@
 
 import base64
 import hashlib
-import importlib.util
 import json
 import secrets
 import shutil
@@ -155,8 +154,6 @@ def pytest_generate_tests(metafunc: Any) -> None:
 
 
 def pytest_configure(config: Any) -> None:
-    if not config.pluginmanager.has_plugin("base_url"):
-        config.pluginmanager.register(_BaseUrlFallback(), "playwright-base-url")
     config.addinivalue_line(
         "markers", "skip_browser(name): mark test to be skipped a specific browser"
     )
@@ -760,37 +757,47 @@ def pytest_addoption(
         choices=["cli"],
         help="Enable Playwright CLI debugging. Requires -s/--capture=no.",
     )
-    if not _is_pytest_base_url_available(pluginmanager):
-        # Same options as the optional pytest-base-url plugin.
-        parser.addini("base_url", help="base url for the application under test.")
-        parser.addoption(
-            "--base-url",
-            metavar="url",
-            default=os.getenv("PYTEST_BASE_URL", None),
-            help="base url for the application under test.",
-        )
 
 
-def _is_pytest_base_url_available(pluginmanager: pytest.PytestPluginManager) -> bool:
-    # pytest-base-url is optional (pip install pytest-playwright[base-url]); when
-    # used it provides --base-url and the base_url fixture.
-    if importlib.util.find_spec("pytest_base_url") is None:
-        return False
-    return not pluginmanager.is_blocked("base_url")
+@pytest.hookimpl(hookwrapper=True)
+def pytest_load_initial_conftests(
+    early_config: Any, parser: pytest.Parser
+) -> Generator[None, None, None]:
+    yield
+    # By now every plugin is registered: from -p, PYTEST_PLUGINS, the entry points
+    # (unless autoloading is disabled) and the initial conftests. So this is the
+    # first point where it is known whether pytest-base-url is in use, and options
+    # can still be added, as the command line is parsed afterwards.
+    if _is_pytest_base_url_loaded(early_config.pluginmanager):
+        return
+    # pytest-base-url is optional (pip install pytest-playwright[base-url]). When
+    # it is not in use, provide the same option, ini value and fixture.
+    parser.addini("base_url", help="base url for the application under test.")
+    parser.getgroup("playwright", "Playwright").addoption(
+        "--base-url",
+        metavar="url",
+        default=os.getenv("PYTEST_BASE_URL", None),
+        help="base url for the application under test.",
+    )
+    early_config.pluginmanager.register(_BaseUrlFallback(), "playwright-base-url")
+
+
+def _is_pytest_base_url_loaded(pluginmanager: pytest.PytestPluginManager) -> bool:
+    # Registered as "base_url" through its entry point, or under its module name
+    # with -p pytest_base_url.plugin; checking the module covers both.
+    module = sys.modules.get("pytest_base_url.plugin")
+    return module is not None and pluginmanager.is_registered(module)
 
 
 class _BaseUrlFallback:
-    # Provides the base_url fixture when pytest-base-url is not used.
+    # Provides the base_url fixture when pytest-base-url is not in use.
     @pytest.fixture(scope="session")
     def base_url(self, pytestconfig: Any) -> Optional[str]:
-        base_url = pytestconfig.getoption("--base-url", default=None)
-        if base_url:
-            return base_url
-        try:
-            return pytestconfig.getini("base_url") or None
-        except ValueError:
-            # --base-url and the ini value are not registered.
-            return None
+        return (
+            pytestconfig.getoption("--base-url")
+            or pytestconfig.getini("base_url")
+            or None
+        )
 
 
 class ArtifactsRecorder:
