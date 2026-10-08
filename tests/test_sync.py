@@ -42,7 +42,7 @@ def _add_ini(request: pytest.FixtureRequest, testdir: pytest.Testdir) -> None:
         ".ini",
         pytest="""
         [pytest]
-        addopts = -p no:playwright-asyncio
+        addopts = -p no:playwright-asyncio -p no:rerunfailures
     """,
     )
 
@@ -1038,6 +1038,52 @@ def test_artifact_errors_are_reported_as_teardown_errors(
             "*Playwright artifacts error*",
             "*OSError: disk full*",
         ]
+    )
+
+
+def test_artifacts_are_kept_per_rerun_attempt(testdir: pytest.Testdir) -> None:
+    # https://github.com/microsoft/playwright-pytest/issues/210
+    testdir.makepyfile(
+        """
+        attempts = 0
+
+        def test_flaky(page):
+            global attempts
+            attempts += 1
+            page.set_content("<div>attempt " + str(attempts) + "</div>")
+            assert attempts == 3
+    """
+    )
+    result = testdir.runpytest(
+        "-p",
+        "rerunfailures",
+        "--reruns",
+        "2",
+        "--screenshot",
+        "on",
+        "--video",
+        "on",
+        "--tracing",
+        "retain-on-failure",
+    )
+    result.assert_outcomes(passed=1)
+    assert result.parseoutcomes()["rerun"] == 2
+    test_results_dir = os.path.join(testdir.tmpdir, "test-results")
+    _assert_folder_structure(
+        test_results_dir,
+        """
+- test-artifacts-are-kept-per-rerun-attempt-py-test-flaky-chromium:
+  - test-failed-1.png
+  - trace.zip
+  - video.webm
+- test-artifacts-are-kept-per-rerun-attempt-py-test-flaky-chromium-retry1:
+  - test-failed-1.png
+  - trace.zip
+  - video.webm
+- test-artifacts-are-kept-per-rerun-attempt-py-test-flaky-chromium-retry2:
+  - test-finished-1.png
+  - video.webm
+""",
     )
 
 
