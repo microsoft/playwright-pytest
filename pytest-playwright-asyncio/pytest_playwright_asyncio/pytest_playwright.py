@@ -831,7 +831,8 @@ def _is_pytest_base_url_loaded(pluginmanager: pytest.PytestPluginManager) -> boo
 class _BaseUrlFallback:
     # Provides the base_url fixture when pytest-base-url is not in use.
     @pytest.fixture(scope="session")
-    def base_url(self, pytestconfig: Any) -> Optional[str]:
+    @classmethod
+    def base_url(cls, pytestconfig: Any) -> Optional[str]:
         return (
             pytestconfig.getoption("--base-url")
             or pytestconfig.getini("base_url")
