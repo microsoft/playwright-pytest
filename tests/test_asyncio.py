@@ -482,6 +482,27 @@ def test_base_url_without_pytest_base_url(
     result.assert_outcomes(passed=1)
 
 
+def test_base_url_without_pytest_base_url_does_not_warn(
+    testdir: pytest.Testdir,
+) -> None:
+    # https://github.com/microsoft/playwright-pytest/issues/341
+    testdir.makepyfile(
+        """
+        def test_base_url(base_url):
+            assert base_url == "http://localhost"
+    """
+    )
+    result = testdir.runpytest(
+        "-p",
+        "no:base_url",
+        "--base-url",
+        "http://localhost",
+        "-W",
+        "error::pytest.PytestDeprecationWarning",
+    )
+    result.assert_outcomes(passed=1)
+
+
 def test_base_url_without_plugin_autoload(
     testdir: pytest.Testdir,
     test_server: HTTPTestServer,
