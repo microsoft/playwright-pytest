@@ -473,7 +473,12 @@ def test_base_url_without_pytest_base_url(
     source: str,
 ) -> None:
     # https://github.com/microsoft/playwright-pytest/issues/311
-    args = ["-p", "no:base_url"]
+    args = [
+        "-p",
+        "no:base_url",
+        "-W",
+        "error:session-scoped fixtures defined as instance methods:pytest.PytestDeprecationWarning",
+    ]
     if source == "option":
         args += ["--base-url", test_server.PREFIX]
     elif source == "ini":
