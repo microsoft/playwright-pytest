@@ -71,6 +71,8 @@ import tempfile
 import traceback
 import urllib.parse
 
+from pytest_playwright import _base_url_fallback
+
 
 @pytest.fixture(scope="session")
 def _pw_artifacts_folder(
@@ -815,7 +817,7 @@ def pytest_load_initial_conftests(
         default=os.getenv("PYTEST_BASE_URL", None),
         help="base url for the application under test.",
     )
-    early_config.pluginmanager.register(_BaseUrlFallback(), "playwright-base-url")
+    early_config.pluginmanager.register(_base_url_fallback, "playwright-base-url")
 
 
 def _is_pytest_base_url_loaded(pluginmanager: pytest.PytestPluginManager) -> bool:
@@ -823,17 +825,6 @@ def _is_pytest_base_url_loaded(pluginmanager: pytest.PytestPluginManager) -> boo
     # with -p pytest_base_url.plugin; checking the module covers both.
     module = sys.modules.get("pytest_base_url.plugin")
     return module is not None and pluginmanager.is_registered(module)
-
-
-class _BaseUrlFallback:
-    # Provides the base_url fixture when pytest-base-url is not in use.
-    @pytest.fixture(scope="session")
-    def base_url(self, pytestconfig: Any) -> Optional[str]:
-        return (
-            pytestconfig.getoption("--base-url")
-            or pytestconfig.getini("base_url")
-            or None
-        )
 
 
 class ArtifactsRecorder:

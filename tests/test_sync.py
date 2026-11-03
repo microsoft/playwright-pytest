@@ -492,7 +492,9 @@ def test_base_url_without_pytest_base_url(
     """
     )
     result = testdir.runpytest(*args)
-    result.assert_outcomes(passed=1)
+    # The fallback fixture must not trip pytest's deprecations, see
+    # https://github.com/microsoft/playwright-pytest/issues/341
+    result.assert_outcomes(passed=1, warnings=0)
 
 
 def test_base_url_without_plugin_autoload(
