@@ -504,6 +504,17 @@ def connect_options() -> Optional[Dict]:
     return None
 
 
+def _to_remote_launch_options(launch_options: Dict) -> Dict:
+    # The server reads the launch options header with the protocol option
+    # names, e.g. slowMo, while the Python API takes slow_mo. Only the option
+    # names are converted, values like firefox_user_prefs are passed as is.
+    def to_camel_case(name: str) -> str:
+        first, *rest = name.split("_")
+        return first + "".join(word[:1].upper() + word[1:] for word in rest)
+
+    return {to_camel_case(name): value for name, value in launch_options.items()}
+
+
 @pytest.fixture(scope="session")
 def launch_browser(
     browser_type_launch_args: Dict,
@@ -518,7 +529,9 @@ def launch_browser(
                     {
                         **connect_options,
                         "headers": {
-                            "x-playwright-launch-options": json.dumps(launch_options),
+                            "x-playwright-launch-options": json.dumps(
+                                _to_remote_launch_options(launch_options)
+                            ),
                             **(connect_options.get("headers") or {}),
                         },
                     }
