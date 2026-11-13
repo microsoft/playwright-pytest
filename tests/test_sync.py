@@ -1619,8 +1619,16 @@ def test_connect_options_should_work(testdir: pytest.Testdir) -> None:
         )
         testdir.makepyfile(
             """
-            def test_connect_options(page):
+            import time
+
+            def test_connect_options(page, pytestconfig):
                 assert page.evaluate("1 + 1") == 2
+                page.set_content("<button>Click</button>")
+                started = time.monotonic()
+                for _ in range(3):
+                    page.get_by_role("button").click()
+                slowmo = pytestconfig.getoption("--slowmo")
+                assert time.monotonic() - started >= 3 * slowmo / 1000
             """
         )
         result = testdir.runpytest()
@@ -1635,6 +1643,9 @@ def test_connect_options_should_work(testdir: pytest.Testdir) -> None:
             if "Listening on" in str(stdout.readline()):
                 break
         result = testdir.runpytest()
+        result.assert_outcomes(passed=1)
+        # Launch options are sent to the server with the protocol option names.
+        result = testdir.runpytest("--slowmo", "300")
         result.assert_outcomes(passed=1)
     finally:
         assert server_process
