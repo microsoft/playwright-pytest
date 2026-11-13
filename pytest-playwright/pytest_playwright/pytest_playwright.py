@@ -513,12 +513,16 @@ def launch_browser(
     def launch(**kwargs: Dict) -> Browser:
         launch_options = {**browser_type_launch_args, **kwargs}
         if connect_options:
+            remote_launch_options = dict(launch_options)
+            # remote launch headers bypass the Python API's option-name conversion
+            if "slow_mo" in remote_launch_options:
+                remote_launch_options["slowMo"] = remote_launch_options.pop("slow_mo")
             browser = browser_type.connect(
                 **(
                     {
                         **connect_options,
                         "headers": {
-                            "x-playwright-launch-options": json.dumps(launch_options),
+                            "x-playwright-launch-options": json.dumps(remote_launch_options),
                             **(connect_options.get("headers") or {}),
                         },
                     }

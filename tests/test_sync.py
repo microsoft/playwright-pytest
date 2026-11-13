@@ -1603,7 +1603,8 @@ def test_with_page(page):
     ]
 
 
-def test_connect_options_should_work(testdir: pytest.Testdir) -> None:
+@pytest.mark.parametrize("slowmo", [0, 500])
+def test_connect_options_should_work(testdir: pytest.Testdir, slowmo: int) -> None:
     server_process = None
     try:
         testdir.makeconftest(
@@ -1619,11 +1620,17 @@ def test_connect_options_should_work(testdir: pytest.Testdir) -> None:
         )
         testdir.makepyfile(
             """
-            def test_connect_options(page):
-                assert page.evaluate("1 + 1") == 2
+            import time
+
+            def test_connect_options(page, pytestconfig):
+                page.set_content("<button>Click</button>")
+                started = time.monotonic()
+                for _ in range(5):
+                    page.get_by_role("button").click()
+                assert time.monotonic() - started >= 5 * pytestconfig.getoption("--slowmo") / 1000
             """
         )
-        result = testdir.runpytest()
+        result = testdir.runpytest("--slowmo", str(slowmo))
         assert "connect ECONNREFUSED" in "\n".join(result.outlines + result.errlines)
         server_process = subprocess.Popen(
             ["playwright", "run-server", "--port=1234"],
@@ -1634,7 +1641,7 @@ def test_connect_options_should_work(testdir: pytest.Testdir) -> None:
             assert stdout
             if "Listening on" in str(stdout.readline()):
                 break
-        result = testdir.runpytest()
+        result = testdir.runpytest("--slowmo", str(slowmo))
         result.assert_outcomes(passed=1)
     finally:
         assert server_process
