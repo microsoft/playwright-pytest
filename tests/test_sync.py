@@ -1564,6 +1564,41 @@ def test_new_context_allow_passing_args(
     result.assert_outcomes(passed=1)
 
 
+def test_output_folder_is_emptied_when_it_cannot_be_removed(
+    testdir: pytest.Testdir,
+) -> None:
+    # e.g. a mounted folder: https://github.com/microsoft/playwright/issues/12106
+    testdir.makeconftest(
+        """
+        import errno
+        import os
+        import shutil
+
+        _rmtree = shutil.rmtree
+
+        def rmtree(path, *args, **kwargs):
+            if os.path.abspath(path) == os.path.abspath("test-results"):
+                raise OSError(errno.EBUSY, "Device or resource busy", path)
+            return _rmtree(path, *args, **kwargs)
+
+        shutil.rmtree = rmtree
+        """
+    )
+    testdir.makepyfile(
+        """
+        def test_passing(page):
+            pass
+        """
+    )
+    os.makedirs(os.path.join(testdir.tmpdir, "test-results", "old-test"))
+    testdir.tmpdir.join("test-results", "old-file.txt").write("")
+    os.makedirs(os.path.join(testdir.tmpdir, "old-test"))
+    result = testdir.runpytest()
+    result.assert_outcomes(passed=1)
+    assert os.listdir(os.path.join(testdir.tmpdir, "test-results")) == []
+    assert os.path.isdir(os.path.join(testdir.tmpdir, "old-test"))
+
+
 def test_output_path_via_pytest_runtest_makereport_hook(
     testdir: pytest.Testdir,
 ) -> None:
