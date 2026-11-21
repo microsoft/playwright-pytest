@@ -113,9 +113,12 @@ def delete_output_dir(pytestconfig: Any) -> None:
             #   https://github.com/microsoft/playwright/issues/12106
             #   https://github.com/microsoft/playwright-python/issues/1781
             # Do a best-effort to remove all files inside of it instead.
-            entries = os.listdir(output_dir)
-            for entry in entries:
-                shutil.rmtree(entry)
+            for entry in os.listdir(output_dir):
+                path = os.path.join(output_dir, entry)
+                if os.path.isdir(path) and not os.path.islink(path):
+                    shutil.rmtree(path)
+                else:
+                    os.remove(path)
 
 
 @pytest.hookimpl(wrapper=True, tryfirst=True)
