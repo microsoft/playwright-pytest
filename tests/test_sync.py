@@ -1548,6 +1548,7 @@ def test_new_context_allow_passing_args(
         """
         import pytest
 
+        @pytest.mark.browser_context_args(user_agent="default-agent")
         def test_artifact_collection(new_context):
             context1 = new_context(user_agent="agent1")
             page1 = context1.new_page()
@@ -1558,6 +1559,11 @@ def test_new_context_allow_passing_args(
             page2 = context2.new_page()
             assert page2.evaluate("window.navigator.userAgent") == "agent2"
             context2.close()
+
+            default_context = new_context()
+            default_page = default_context.new_page()
+            assert default_page.evaluate("window.navigator.userAgent") == "default-agent"
+            default_context.close()
             """
     )
     result = testdir.runpytest()
