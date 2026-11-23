@@ -613,7 +613,7 @@ async def new_context(
     debug_cli = request.config.getoption("--playwright-debug", default=None) == "cli"
 
     async def _new_context(**kwargs: Any) -> BrowserContext:
-        context = await browser.new_context(**browser_context_args, **kwargs)
+        context = await browser.new_context(**{**browser_context_args, **kwargs})
         original_close = context.close
 
         async def _close_wrapper(*args: Any, **kwargs: Any) -> None:

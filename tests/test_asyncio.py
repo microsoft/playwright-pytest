@@ -1624,6 +1624,7 @@ def test_new_context_allow_passing_args(
         import pytest
 
         @pytest.mark.asyncio
+        @pytest.mark.browser_context_args(user_agent="default-agent")
         async def test_artifact_collection(new_context):
             context1 = await new_context(user_agent="agent1")
             page1 = await context1.new_page()
@@ -1634,6 +1635,11 @@ def test_new_context_allow_passing_args(
             page2 = await context2.new_page()
             assert await page2.evaluate("window.navigator.userAgent") == "agent2"
             await context2.close()
+
+            default_context = await new_context()
+            default_page = await default_context.new_page()
+            assert await default_page.evaluate("window.navigator.userAgent") == "default-agent"
+            await default_context.close()
             """
     )
     result = testdir.runpytest()
