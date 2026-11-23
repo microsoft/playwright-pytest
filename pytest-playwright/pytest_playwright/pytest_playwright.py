@@ -612,8 +612,10 @@ def new_context(
         original_close = context.close
 
         def _close_wrapper(*args: Any, **kwargs: Any) -> None:
-            contexts.remove(context)
-            _artifacts_recorder.on_will_close_browser_context(context)
+            # BrowserContext.close() may be called more than once.
+            if context in contexts:
+                contexts.remove(context)
+                _artifacts_recorder.on_will_close_browser_context(context)
             original_close(*args, **kwargs)
 
         context.close = _close_wrapper

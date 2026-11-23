@@ -1532,6 +1532,31 @@ def test_artifact_collection_should_work_for_manually_created_contexts_get_close
     )
 
 
+def test_context_can_be_closed_twice(testdir: pytest.Testdir) -> None:
+    testdir.makepyfile(
+        """
+        import pytest
+
+        @pytest.mark.asyncio
+        async def test_close_twice(context):
+            page = await context.new_page()
+            await page.goto("data:text/html,<div>hello</div>")
+            await context.close()
+            await context.close()
+        """
+    )
+    result = testdir.runpytest("--tracing", "on")
+    result.assert_outcomes(passed=1)
+    test_results_dir = os.path.join(testdir.tmpdir, "test-results")
+    _assert_folder_structure(
+        test_results_dir,
+        """
+- test-context-can-be-closed-twice-py-test-close-twice-chromium:
+  - trace.zip
+""",
+    )
+
+
 def test_artifact_collection_should_work_for_manually_created_contexts_retain_on_failure_failed(
     testdir: pytest.Testdir,
 ) -> None:
