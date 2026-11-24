@@ -1591,6 +1591,46 @@ def test_new_context_allow_passing_args(
     result.assert_outcomes(passed=1)
 
 
+def test_output_folder_is_emptied_when_an_entry_cannot_be_removed(
+    testdir: pytest.Testdir,
+) -> None:
+    # e.g. a mounted folder: https://github.com/microsoft/playwright/issues/12106
+    # Removing a mount point empties it and then fails with EBUSY.
+    testdir.makeconftest(
+        """
+        import errno
+        import os
+
+        _rmdir = os.rmdir
+
+        def rmdir(path, *args, **kwargs):
+            if os.path.basename(path) == "mounted":
+                raise OSError(errno.EBUSY, "Device or resource busy", path)
+            return _rmdir(path, *args, **kwargs)
+
+        os.rmdir = rmdir
+        """
+    )
+    testdir.makepyfile(
+        """
+        def test_passing(page):
+            pass
+        """
+    )
+    output_dir = testdir.tmpdir.join("test-results")
+    for name in ["a-old-test", "mounted", "z-old-test"]:
+        output_dir.join(name, "trace.zip").write("", ensure=True)
+        # Folders next to the output folder must survive.
+        testdir.tmpdir.join(name, "keep.txt").write("", ensure=True)
+    output_dir.join("old-file.txt").write("")
+    result = testdir.runpytest()
+    result.assert_outcomes(passed=1)
+    assert os.listdir(output_dir) == ["mounted"]
+    assert os.listdir(output_dir.join("mounted")) == []
+    for name in ["a-old-test", "mounted", "z-old-test"]:
+        assert os.listdir(testdir.tmpdir.join(name)) == ["keep.txt"]
+
+
 def test_output_path_via_pytest_runtest_makereport_hook(
     testdir: pytest.Testdir,
 ) -> None:

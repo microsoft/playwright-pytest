@@ -109,10 +109,9 @@ def delete_output_dir(pytestconfig: Any) -> None:
             # We failed to remove folder, might be due to the whole folder being mounted inside a container:
             #   https://github.com/microsoft/playwright/issues/12106
             #   https://github.com/microsoft/playwright-python/issues/1781
-            # Do a best-effort to remove all files inside of it instead.
-            entries = os.listdir(output_dir)
-            for entry in entries:
-                shutil.rmtree(entry)
+            # The attempt above stops at the first busy entry, so do a best-effort
+            # to remove everything else, leaving behind only what cannot be removed.
+            shutil.rmtree(output_dir, ignore_errors=True)
 
 
 @pytest.hookimpl(wrapper=True, tryfirst=True)
