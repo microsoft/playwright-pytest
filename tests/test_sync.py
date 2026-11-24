@@ -1564,24 +1564,24 @@ def test_new_context_allow_passing_args(
     result.assert_outcomes(passed=1)
 
 
-def test_output_folder_is_emptied_when_it_cannot_be_removed(
+def test_output_folder_is_emptied_when_an_entry_cannot_be_removed(
     testdir: pytest.Testdir,
 ) -> None:
     # e.g. a mounted folder: https://github.com/microsoft/playwright/issues/12106
+    # Removing a mount point empties it and then fails with EBUSY.
     testdir.makeconftest(
         """
         import errno
         import os
-        import shutil
 
-        _rmtree = shutil.rmtree
+        _rmdir = os.rmdir
 
-        def rmtree(path, *args, **kwargs):
-            if os.path.abspath(path) == os.path.abspath("test-results"):
+        def rmdir(path, *args, **kwargs):
+            if os.path.basename(path) == "mounted":
                 raise OSError(errno.EBUSY, "Device or resource busy", path)
-            return _rmtree(path, *args, **kwargs)
+            return _rmdir(path, *args, **kwargs)
 
-        shutil.rmtree = rmtree
+        os.rmdir = rmdir
         """
     )
     testdir.makepyfile(
@@ -1590,13 +1590,18 @@ def test_output_folder_is_emptied_when_it_cannot_be_removed(
             pass
         """
     )
-    os.makedirs(os.path.join(testdir.tmpdir, "test-results", "old-test"))
-    testdir.tmpdir.join("test-results", "old-file.txt").write("")
-    os.makedirs(os.path.join(testdir.tmpdir, "old-test"))
+    output_dir = testdir.tmpdir.join("test-results")
+    for name in ["a-old-test", "mounted", "z-old-test"]:
+        output_dir.join(name, "trace.zip").write("", ensure=True)
+        # Folders next to the output folder must survive.
+        testdir.tmpdir.join(name, "keep.txt").write("", ensure=True)
+    output_dir.join("old-file.txt").write("")
     result = testdir.runpytest()
     result.assert_outcomes(passed=1)
-    assert os.listdir(os.path.join(testdir.tmpdir, "test-results")) == []
-    assert os.path.isdir(os.path.join(testdir.tmpdir, "old-test"))
+    assert os.listdir(output_dir) == ["mounted"]
+    assert os.listdir(output_dir.join("mounted")) == []
+    for name in ["a-old-test", "mounted", "z-old-test"]:
+        assert os.listdir(testdir.tmpdir.join(name)) == ["keep.txt"]
 
 
 def test_output_path_via_pytest_runtest_makereport_hook(
